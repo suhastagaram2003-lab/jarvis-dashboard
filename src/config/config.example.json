@@ -24,7 +24,8 @@
   },
   "hub": {
     "jarvisHome": "~/.jarvis",
-    "refreshMs": 30000
+    "refreshMs": 30000,
+    "claudePath": ""
   },
   "projects": {
     "mode": "registry",
@@ -33,6 +34,7 @@
   },
   "layout": [
     { "type": "header" },
+    { "type": "command-box" },
     { "type": "project-strip" },
     { "type": "waiting-on-you" },
     { "type": "what-we-learned" },

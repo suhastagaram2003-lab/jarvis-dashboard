@@ -197,6 +197,7 @@ const WIDGET_MAP = {
   "what-we-learned":       "widgets/what-we-learned/index.js",
   "fix-next":              "widgets/fix-next/index.js",
   "hub-metrics":           "widgets/hub-metrics/index.js",
+  "command-box":           "widgets/command-box/index.js",
   "live-sessions":         "widgets/live-sessions/index.js",
   "system-diagnostics":    "widgets/system-diagnostics/index.js",
   "agent-cards":           "widgets/agent-cards/index.js",
@@ -220,6 +221,7 @@ const DEFERRED_WIDGETS = new Set([
 // ── Render layout ──
 const layout = config.layout || [
   { type: "header" },
+  { type: "command-box" },
   { type: "project-strip" },
   { type: "waiting-on-you" },
   { type: "what-we-learned" },

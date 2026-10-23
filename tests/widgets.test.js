@@ -133,6 +133,34 @@ test("fix next, metrics and mission control show the fixture; empty states witho
   assert.match(loadModule("widgets/mission-control/index.js", empty).textContent, /No links yet/);
 });
 
+test("command box: a question with & and quotes reaches claude as one argument", { skip: process.platform === "win32" }, async () => {
+  const { ctx } = makeCtx(jarvisHome());
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), "jarvis-claude-"));
+  const fake = path.join(bin, "claude");
+  fs.writeFileSync(fake, "#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({ result: 'got: ' + process.argv[3] + ' cwd-ok:' + (process.cwd().length > 0), is_error: false }));\n");
+  fs.chmodSync(fake, 0o755);
+  ctx.config = { ...ctx.config, hub: { ...ctx.config.hub, claudePath: fake } };
+  ctx.markdownRenderer = { renderMarkdown: (t) => { const d = document.createElement("div"); d.textContent = t; return d; } };
+  const w = loadModule("widgets/command-box/index.js", ctx);
+  const [area] = w.findAll(n => n.tagName === "TEXTAREA");
+  area.value = 'what about "ORB" & echo hi';
+  await buttons(w).find(b => b.textContent === "Ask").click();
+  assert.match(w.textContent, /got: \/ask what about "ORB" & echo hi cwd-ok:true/);
+  assert.match(w.textContent, /--disallowedTools Bash,PowerShell/);
+});
+
+test("command box: missing claude shows the setup hint", async () => {
+  const { ctx } = makeCtx(jarvisHome());
+  ctx.config = { ...ctx.config, hub: { claudePath: "/nope/claude.exe" } };
+  const w = loadModule("widgets/command-box/index.js", { ...ctx, require: (m) => m === "child_process"
+    ? { ...require("child_process"), execFileSync: () => "" }
+    : m === "os" ? { ...require("os"), homedir: () => "/nonexistent-home" } : require(m) });
+  const [area] = w.findAll(n => n.tagName === "TEXTAREA");
+  area.value = "q";
+  await buttons(w).find(b => b.textContent === "Ask").click();
+  assert.match(w.textContent, /claude\.exe not found; set hub\.claudePath/);
+});
+
 test("header: waiting text from the hub", (t) => {
   t.mock.timers.enable({ apis: ["setInterval", "setTimeout"] }); // the clock and typing effect tick forever
   const { ctx } = makeCtx(jarvisHome());
