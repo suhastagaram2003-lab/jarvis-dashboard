@@ -111,6 +111,28 @@ test("agent cards: one card per exported agent with status", () => {
   assert.equal(ctx.agentCardRefs.get("ORB bot").sText.textContent, "ok");
 });
 
+test("what we learned: fixture lesson, click opens its link", async () => {
+  const { ctx } = makeCtx(jarvisHome());
+  const opened = []; ctx.osCompat.open = (t) => opened.push(t);
+  const w = loadModule("widgets/what-we-learned/index.js", ctx);
+  assert.match(w.textContent, /Wide opening ranges fail more often/);
+  const row = w.findAll(n => /^Open obsidian:/.test(n.title))[0];
+  await row.click();
+  assert.match(opened[0], /^obsidian:\/\/open\?vault=Suhas/);
+});
+
+test("fix next, metrics and mission control show the fixture; empty states without a registry", () => {
+  const { ctx } = makeCtx(jarvisHome());
+  assert.match(loadModule("widgets/fix-next/index.js", ctx).textContent, /#1[\s\S]*Split the nightly report/);
+  assert.match(loadModule("widgets/hub-metrics/index.js", ctx).textContent, /\+1\.8%[\s\S]*ORB paper P&L/);
+  assert.match(loadModule("widgets/mission-control/index.js", ctx).textContent, /MarketBrain[\s\S]*Vault/);
+  const empty = makeCtx(jarvisHome({ registry: false })).ctx;
+  assert.match(loadModule("widgets/what-we-learned/index.js", empty).textContent, /Nothing new in 14 days/);
+  assert.match(loadModule("widgets/fix-next/index.js", empty).textContent, /No suggestions/);
+  assert.match(loadModule("widgets/hub-metrics/index.js", empty).textContent, /No metrics yet/);
+  assert.match(loadModule("widgets/mission-control/index.js", empty).textContent, /No links yet/);
+});
+
 test("header: waiting text from the hub", (t) => {
   t.mock.timers.enable({ apis: ["setInterval", "setTimeout"] }); // the clock and typing effect tick forever
   const { ctx } = makeCtx(jarvisHome());

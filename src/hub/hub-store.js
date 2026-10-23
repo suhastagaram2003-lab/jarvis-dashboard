@@ -2,7 +2,7 @@
 // Reads ~/.jarvis/registry.json and ~/.jarvis/projects/<name>.json; never writes anything.
 // ctx.hubSchema: the parsed schema/hub-export-v1.json (the loader reads it; tests pass it in).
 // Returns: { expandHome, validateExport, parseExport, loadRegistry, loadProjects, mergeQueue, waitingCount,
-//            waitingText, projectCard, agentCards }
+//            waitingText, projectCard, agentCards, learningFeed, suggestionFeed, metricTiles, linkGroups }
 
 const SCHEMA = ctx.hubSchema;
 const SUPPORTED_SCHEMA = 1;
@@ -182,7 +182,40 @@ function agentCards(projects) {
   return cards;
 }
 
+// ── Feeds for the learning, suggestions, metrics and links widgets (ok/stale projects only) ──
+function tagged(projects, field) {
+  const rows = [];
+  projects.forEach((p, order) => {
+    if (!usable(p)) return;
+    for (const row of p.data[field] || []) {
+      rows.push({ ...row, project: p.entry.label || p.entry.name, color: p.entry.color, order });
+    }
+  });
+  return rows;
+}
+
+function learningFeed(projects, limit = 15) {
+  return tagged(projects, "learning")
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)) || a.order - b.order)
+    .slice(0, limit);
+}
+
+function suggestionFeed(projects) {
+  return tagged(projects, "suggestions").sort((a, b) => (a.rank - b.rank) || (a.order - b.order));
+}
+
+function metricTiles(projects) {
+  return tagged(projects, "metrics");
+}
+
+function linkGroups(projects) {
+  return projects
+    .filter(p => usable(p) && (p.data.links || []).length > 0)
+    .map(p => ({ project: p.entry.label || p.entry.name, color: p.entry.color, links: p.data.links }));
+}
+
 return {
+  learningFeed, suggestionFeed, metricTiles, linkGroups,
   expandHome, validateExport, parseExport, loadRegistry, loadProjects, mergeQueue, waitingCount, waitingText,
   projectCard, agentCards,
 };

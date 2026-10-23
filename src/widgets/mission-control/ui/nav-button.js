@@ -24,7 +24,8 @@ function createNavButton(dashboard, idx) {
   });
 
   btn.addEventListener("click", () => {
-    app.workspace.openLinkText(dash.path, "/", false);
+    if (dash.onClick) dash.onClick();
+    else app.workspace.openLinkText(dash.path, "/", false);
   });
 
   btn.appendChild(el("div", {
@@ -35,7 +36,7 @@ function createNavButton(dashboard, idx) {
     color: dash.color, background: dash.color + "0a",
   }, dash.icon));
 
-  const textWrap = el("div", { flex: "1" });
+  const textWrap = el("div", { flex: "1", minWidth: "0" });
   btn.appendChild(textWrap);
 
   textWrap.appendChild(el("div", {
@@ -45,7 +46,8 @@ function createNavButton(dashboard, idx) {
 
   textWrap.appendChild(el("div", {
     fontSize: "10px", color: T.textMuted, letterSpacing: "0.5px",
-  }, "Open dashboard \u2192"));
+    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+  }, dash.subtitle || "Open dashboard \u2192"));
 
   const arrow = el("span", {
     fontSize: "18px", color: dash.color + "66", transition: "color 0.3s",
