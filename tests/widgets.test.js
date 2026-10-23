@@ -161,6 +161,28 @@ test("command box: missing claude shows the setup hint", async () => {
   assert.match(w.textContent, /claude\.exe not found; set hub\.claudePath/);
 });
 
+test("quick capture: writes the picked project's inbox and nothing else", async () => {
+  const home = jarvisHome();
+  const { ctx } = makeCtx(home);
+  const notices = [];
+  globalThis.Notice = class { constructor(m) { notices.push(m); } };
+  const w = loadModule("widgets/quick-capture/index.js", ctx);
+  assert.match(w.textContent, /0 IN MARKETBRAIN INBOX/);
+  const [picker] = w.findAll(n => n.tagName === "SELECT");
+  picker.value = "betbrain";
+  const [area] = w.findAll(n => n.tagName === "TEXTAREA");
+  area.value = "https://example.com/line-movement";
+  const btn = w.findAll(n => (n._listeners.click || []).length > 0 && /Capture/.test(n.textContent))[0];
+  await btn.click();
+  const files = fs.readdirSync(path.join(home, "inbox", "betbrain"));
+  assert.equal(files.length, 1);
+  assert.match(files[0], /^\d{4}-\d{2}-\d{2}-\d{6}\.md$/);
+  assert.equal(fs.existsSync(path.join(home, "inbox", "marketbrain")), false);
+  assert.equal(area.value, "");
+  assert.match(notices[0], /Captured for BetBrain/);
+  delete globalThis.Notice;
+});
+
 test("header: waiting text from the hub", (t) => {
   t.mock.timers.enable({ apis: ["setInterval", "setTimeout"] }); // the clock and typing effect tick forever
   const { ctx } = makeCtx(jarvisHome());

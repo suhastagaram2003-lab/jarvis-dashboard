@@ -221,7 +221,7 @@ const DEFERRED_WIDGETS = new Set([
 // ── Render layout ──
 const layout = config.layout || [
   { type: "header" },
-  { type: "command-box" },
+  { type: "row", columns: 2, widgets: ["command-box", "quick-capture"] },
   { type: "project-strip" },
   { type: "waiting-on-you" },
   { type: "what-we-learned" },
