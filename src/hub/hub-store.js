@@ -2,7 +2,8 @@
 // Reads ~/.jarvis/registry.json and ~/.jarvis/projects/<name>.json; never writes anything.
 // ctx.hubSchema: the parsed schema/hub-export-v1.json (the loader reads it; tests pass it in).
 // Returns: { expandHome, validateExport, parseExport, loadRegistry, loadProjects, mergeQueue, waitingCount,
-//            waitingText, projectCard, agentCards, learningFeed, suggestionFeed, metricTiles, linkGroups }
+//            waitingText, projectCard, agentCards, learningFeed, suggestionFeed, metricTiles, linkGroups,
+//            projectForDir, mergeStats }
 
 const SCHEMA = ctx.hubSchema;
 const SUPPORTED_SCHEMA = 1;
@@ -214,7 +215,59 @@ function linkGroups(projects) {
     .map(p => ({ project: p.entry.label || p.entry.name, color: p.entry.color, links: p.data.links }));
 }
 
+// ── Sessions and analytics by project ──
+// A ~/.claude/projects folder belongs to the registry entry with the longest matching claude_projects_prefix
+// (worktrees add a suffix to the project's folder name, so they match too).
+function projectForDir(dirName, entries) {
+  const name = String(dirName).toLowerCase();
+  let best = null;
+  for (const e of entries || []) {
+    const prefix = String(e.claude_projects_prefix || "").toLowerCase();
+    if (!prefix || !name.startsWith(prefix)) continue;
+    if (!best || prefix.length > best.claude_projects_prefix.length) best = e;
+  }
+  return best;
+}
+
+// Sums upstream's stats shape across projects and adds byProject rows.
+function mergeStats(perProject) {
+  const out = {
+    totalSessions: 0, totalMessages: 0, totalTokens: 0, totalCost: 0, totalToolCalls: 0,
+    dailyActivity: {}, hourlyActivity: new Array(24).fill(0), byProject: [],
+  };
+  const models = {};
+  for (const { project, stats } of perProject) {
+    const st = stats || {};
+    out.totalSessions += st.totalSessions || 0;
+    out.totalMessages += st.totalMessages || 0;
+    out.totalTokens += st.totalTokens || 0;
+    out.totalCost += st.totalCost || 0;
+    out.totalToolCalls += st.totalToolCalls || 0;
+    for (const [day, d] of Object.entries(st.dailyActivity || {})) {
+      const t = out.dailyActivity[day] || (out.dailyActivity[day] = { messages: 0, sessions: 0 });
+      t.messages += d.messages || 0;
+      t.sessions += d.sessions || 0;
+    }
+    (st.hourlyActivity || []).forEach((n, h) => { out.hourlyActivity[h] += n || 0; });
+    for (const b of st.modelBreakdown || []) {
+      const m = models[b.model] || (models[b.model] = { count: 0, cost: 0 });
+      m.count += b.count || 0;
+      m.cost += b.cost || 0;
+    }
+    out.byProject.push({ project, sessions: st.totalSessions || 0, tokens: st.totalTokens || 0, cost: st.totalCost || 0 });
+  }
+  const total = out.totalSessions;
+  out.modelBreakdown = Object.entries(models).map(([model, m]) => ({
+    model, count: m.count, pct: total > 0 ? Math.round((m.count / total) * 100) : 0, cost: m.cost,
+  })).sort((a, b) => b.count - a.count);
+  const fav = out.modelBreakdown[0];
+  out.favoriteModel = fav ? fav.model : "sonnet";
+  out.favPct = fav && total > 0 ? Math.round((fav.count / total) * 100) : 0;
+  return out;
+}
+
 return {
+  projectForDir, mergeStats,
   learningFeed, suggestionFeed, metricTiles, linkGroups,
   expandHome, validateExport, parseExport, loadRegistry, loadProjects, mergeQueue, waitingCount, waitingText,
   projectCard, agentCards,

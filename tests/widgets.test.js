@@ -183,6 +183,18 @@ test("quick capture: writes the picked project's inbox and nothing else", async 
   delete globalThis.Notice;
 });
 
+test("system diagnostics: one row per project", () => {
+  const { ctx } = makeCtx(jarvisHome());
+  ctx.onStatsReady = [];
+  const w = loadModule("widgets/system-diagnostics/index.js", ctx);
+  const merged = ctx.hubStore.mergeStats([
+    { project: "MarketBrain", stats: { totalSessions: 3, totalTokens: 1500, totalCost: 1.25, modelBreakdown: [] } },
+    { project: "BetBrain", stats: { totalSessions: 0, totalTokens: 0, totalCost: 0, modelBreakdown: [] } },
+  ]);
+  ctx.onStatsReady.forEach(cb => cb(merged));
+  assert.match(w.textContent, /MarketBrain 3 sessions 1\.5K tokens \$1\.25[\s\S]*BetBrain 0 sessions/);
+});
+
 test("header: waiting text from the hub", (t) => {
   t.mock.timers.enable({ apis: ["setInterval", "setTimeout"] }); // the clock and typing effect tick forever
   const { ctx } = makeCtx(jarvisHome());

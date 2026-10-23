@@ -11,10 +11,14 @@ const pricing = config.pricing || {
   haiku:  { input: 0.80, output: 4 },
 };
 
-function getStatsDir() {
-  const rootPath = config.projects.rootPath.startsWith("~")
+function expandRoot() {
+  return config.projects.rootPath.startsWith("~")
     ? nodePath.join(require("os").homedir(), config.projects.rootPath.slice(1))
     : config.projects.rootPath;
+}
+
+function getStatsDir() {
+  const rootPath = expandRoot();
   const tracked = ctx.sessionParser.getTrackedProjects();
   if (tracked.length === 0) return null;
   return nodePath.join(rootPath, tracked[0].dir);
@@ -120,6 +124,19 @@ function aggregateStats(cache) {
 }
 
 function computeStats() {
+  // Hub: every folder of every registered project, cached in ~/.jarvis/stats-cache.json
+  if (ctx.hubStore && ctx.hub?.jarvisHome) {
+    const statsScan = new Function("ctx", nodeFs.readFileSync(nodePath.join(ctx._srcDir, "hub", "stats-scan.js"), "utf8"))(ctx);
+    return statsScan.scanProjectStats({
+      fs: nodeFs, path: nodePath, rootPath: expandRoot(), entries: ctx.sessionParser.hubEntries(),
+      cachePath: ctx.sessionParser.statsCachePath(),
+      periodDays: config.widgets?.systemDiagnostics?.periodDays || 30,
+      cacheMs: config.widgets?.systemDiagnostics?.cacheDurationMs || 300000,
+      parseFullSession, aggregateStats,
+      isClaudeProjectDir: ctx.osCompat.isClaudeProjectDir, projectForDir: ctx.hubStore.projectForDir,
+      mergeStats: ctx.hubStore.mergeStats, now: Date.now(),
+    });
+  }
   const statsDir = getStatsDir();
   if (!statsDir) return aggregateStats({ sessions: {} });
 

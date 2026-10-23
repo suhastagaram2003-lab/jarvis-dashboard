@@ -132,3 +132,45 @@ test("metric tiles tagged with project", () => assert.deepEqual(
   store.metricTiles([proj("MB", { metrics: [metric()] })]).map(m => [m.project, m.label]), [["MB", "Hit rate"]]));
 test("links grouped per project", () => assert.equal(store.linkGroups([proj("MB", { links: [link()] })])[0].links.length, 1));
 test("projects without links get no group", () => assert.deepEqual(store.linkGroups([proj("MB", { links: [] })]), []));
+
+// ── Sessions and analytics by project ──
+const entries = [{ label: "MarketBrain", claude_projects_prefix: "C--Users-u-Documents-Suhas" },
+                 { label: "BetBrain", claude_projects_prefix: "C--Users-u-Documents-BetBrain" }];
+const stats = (sessions, tokens, over = {}) => ({
+  totalSessions: sessions, totalMessages: sessions * 10, totalTokens: tokens, totalCost: tokens / 100,
+  totalToolCalls: sessions * 2, favoriteModel: "opus", favPct: 100,
+  dailyActivity: { "2026-10-22": { messages: sessions * 10, sessions } },
+  hourlyActivity: Array.from({ length: 24 }, (_, h) => (h === 9 ? sessions : 0)),
+  modelBreakdown: [{ model: "opus", count: sessions, pct: 100, cost: tokens / 100 }], ...over,
+});
+test("worktree dirs map to their project", () =>
+  assert.equal(store.projectForDir("C--Users-u-Documents-Suhas--claude-worktrees-x", entries).label, "MarketBrain"));
+test("unknown dirs map to nothing", () => assert.equal(store.projectForDir("C--Users-u-Desktop", entries), null));
+test("the longest prefix wins, case-insensitive", () => {
+  const es = [...entries, { label: "Sub", claude_projects_prefix: "C--Users-u-Documents-Suhas-sub" }];
+  assert.equal(store.projectForDir("c--users-u-documents-suhas-sub-x", es).label, "Sub");
+});
+test("entries without a prefix never match", () =>
+  assert.equal(store.projectForDir("anything", [{ label: "X", claude_projects_prefix: "" }, { label: "Y" }]), null));
+test("stats add up per project", () => {
+  const m = store.mergeStats([{ project: "MB", stats: stats(3, 100) }, { project: "BB", stats: stats(1, 50) }]);
+  assert.deepEqual([m.totalSessions, m.byProject.map(p => p.sessions)], [4, [3, 1]]);
+});
+test("merged stats sum activity and recompute models", () => {
+  const m = store.mergeStats([
+    { project: "MB", stats: stats(3, 100) },
+    { project: "BB", stats: stats(1, 50, { favoriteModel: "sonnet",
+      modelBreakdown: [{ model: "sonnet", count: 1, pct: 100, cost: 0.5 }] }) },
+  ]);
+  assert.equal(m.totalTokens, 150);
+  assert.equal(m.totalMessages, 40);
+  assert.equal(m.hourlyActivity[9], 4);
+  assert.deepEqual(m.dailyActivity["2026-10-22"], { messages: 40, sessions: 4 });
+  assert.deepEqual(m.modelBreakdown.map(b => [b.model, b.count, b.pct]), [["opus", 3, 75], ["sonnet", 1, 25]]);
+  assert.deepEqual([m.favoriteModel, m.favPct], ["opus", 75]);
+  assert.deepEqual(m.byProject, [{ project: "MB", sessions: 3, tokens: 100, cost: 1 }, { project: "BB", sessions: 1, tokens: 50, cost: 0.5 }]);
+});
+test("no projects gives empty stats", () => {
+  const m = store.mergeStats([]);
+  assert.deepEqual([m.totalSessions, m.favPct, m.byProject, m.hourlyActivity.length], [0, 0, [], 24]);
+});

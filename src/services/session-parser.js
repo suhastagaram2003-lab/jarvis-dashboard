@@ -73,8 +73,11 @@ function getTrackedProjects() {
       try {
         const stat = nodeFs.statSync(fullPath);
         if (!stat.isDirectory()) continue;
+        // Registry mode: a folder of a registered project (worktrees included) is labelled with that project.
+        const registered = config.projects.mode === "registry" && ctx.hubStore
+          ? ctx.hubStore.projectForDir(entry, hubEntries()) : null;
         const parts = entry.split("-").filter(Boolean);
-        const label = parts[parts.length - 1] || entry;
+        const label = registered ? (registered.label || registered.name) : (parts[parts.length - 1] || entry);
         discoveredProjects.push({ dir: entry, label });
       } catch {}
     }
@@ -422,9 +425,17 @@ function getAllSessions() {
   } catch { return []; }
 }
 
+function hubEntries() {
+  return (ctx.hub?.projects || []).map(p => p.entry);
+}
+
+function statsCachePath() {
+  return ctx.hub?.jarvisHome ? nodePath.join(ctx.hub.jarvisHome, "stats-cache.json") : null;
+}
+
 function requestWorkerStats() {
   if (!worker) return;
-  worker.postMessage({ type: "computeStats", config });
+  worker.postMessage({ type: "computeStats", config, entries: hubEntries(), cachePath: statsCachePath() });
 }
 
 function cleanup() {
@@ -434,4 +445,4 @@ function cleanup() {
   }
 }
 
-return { getAllSessions, isClaudeProcessRunning, getTrackedProjects, requestWorkerStats, cleanup, get hasWorker() { return !!worker; } };
+return { getAllSessions, isClaudeProcessRunning, getTrackedProjects, requestWorkerStats, hubEntries, statsCachePath, cleanup, get hasWorker() { return !!worker; } };
