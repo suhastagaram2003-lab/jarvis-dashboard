@@ -37,7 +37,8 @@ function processListing(platform = process.platform) {
 function launchArgs(dir, command, platform = process.platform, terminalApp = "Terminal") {
   const cmd = command || "claude";
   if (platform === "win32") {
-    return { file: "wt.exe", args: ["-w", "0", "nt", "-d", dir, "cmd", "/k", cmd] };
+    // Windows Terminal splits its command line on ";" into several commands; ";" keeps a literal one.
+    return { file: "wt.exe", args: ["-w", "0", "nt", "-d", dir, "cmd", "/k", cmd.replace(/;/g, "\\;")] };
   }
   const esc = (s) => String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   return {
@@ -52,7 +53,8 @@ function launchArgs(dir, command, platform = process.platform, terminalApp = "Te
 }
 
 function openArgs(target, platform = process.platform) {
-  if (platform === "win32") return { file: "cmd", args: ["/c", "start", "", target] };
+  // Not `cmd /c start`: cmd would split a URL like obsidian://open?vault=x&file=y at the "&".
+  if (platform === "win32") return { file: "rundll32.exe", args: ["url.dll,FileProtocolHandler", target] };
   return { file: "open", args: [target] };
 }
 

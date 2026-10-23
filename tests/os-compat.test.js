@@ -20,8 +20,12 @@ test("launch keeps a spaced path as one argument", () => assert.deepEqual(
   ["-w", "0", "nt", "-d", "C:\\My Docs\\Suhas", "cmd", "/k", 'claude "/review"']));
 test("launch defaults to claude", () => assert.deepEqual(os.launchArgs("C:\\p", null, "win32"),
   { file: "wt.exe", args: ["-w", "0", "nt", "-d", "C:\\p", "cmd", "/k", "claude"] }));
-test("open on Windows uses start with an empty title", () => assert.deepEqual(os.openArgs("C:\\My Docs\\a.md", "win32"),
-  { file: "cmd", args: ["/c", "start", "", "C:\\My Docs\\a.md"] }));
+test("open on Windows passes the target as one argument, no shell", () => assert.deepEqual(
+  os.openArgs("C:\\My Docs\\a.md", "win32"), { file: "rundll32.exe", args: ["url.dll,FileProtocolHandler", "C:\\My Docs\\a.md"] }));
+test("open on Windows keeps & in a URL (cmd would split the line there)", () => assert.deepEqual(
+  os.openArgs("obsidian://open?vault=Suhas&file=a", "win32").args[1], "obsidian://open?vault=Suhas&file=a"));
+test("launch escapes ; so Windows Terminal does not split the command", () => assert.deepEqual(
+  os.launchArgs("C:\\p", "echo a; echo b", "win32").args.slice(-1), ["echo a\\; echo b"]));
 test("open on macOS", () => assert.deepEqual(os.openArgs("/a b.md", "darwin"), { file: "open", args: ["/a b.md"] }));
 test("runCommand reports failure and stderr tail", async () => {
   const r = await os.runCommand('node -e "console.error(1);console.error(2);process.exit(3)"', process.cwd());
