@@ -289,3 +289,35 @@ test("agent cards carry project color", () => assert.deepEqual(
   `marketbrain.json` to break it shows the error card and the rest still renders; a deliberately throwing widget
   (temporary layout entry `{ "type": "nope" }` pointing at a bad path) shows an error card. Screenshot each.
 - [ ] **Step 3: Commit, push `feat/hub-base`, PR into the hub repo's `dev`** assigned to Lucky, with the screenshots.
+
+## Outcome
+
+Built on branch `feat/hub-base` of `suhastagaram2003-lab/jarvis-dashboard` (the fork kept upstream's name; the PC
+folder stays `C:\Users\sutag\Documents\Jarvis`). `dev` was cut from `main` at `ab4e274` and pushed; `upstream` points
+at `AndrewKochulab/jarvis-dashboard`. The PR into `dev` is opened by the thread, not by the build.
+
+**Shipped:** Tasks 1 to 5 and the README "Hub fork" section of Task 6, with `npm test` at 57 passing tests
+(smoke, hub store, OS compat, session worker, config cascade, and fake-DOM smoke tests for the new widgets).
+
+**Changed from the plan:**
+
+- The schema file is MarketBrain's `tests/fixtures/hub-export-v1.json`, copied as is, so the exporter and the hub
+  share one file (integer counts, no extra keys). `validateExport` interprets that file (passed in as `ctx.hubSchema`)
+  rather than repeating its enums.
+- The test script is `node --test "tests/*.test.js"`: Node 22 does not accept a folder argument.
+- `.gitignore` listed `CLAUDE.md`; that line was removed so the hub's rules are tracked.
+- `os-compat` gained `processCommand` (so the parser's background process check stays non-blocking), an optional
+  terminal app for macOS, and a whole-tree kill on timeout. On Windows, `open` uses
+  `rundll32 url.dll,FileProtocolHandler` instead of `cmd /c start ""`, because cmd splits an `obsidian://` link at
+  `&`; `launch` escapes `;`, which Windows Terminal treats as a command separator.
+- `hub-store` gained `waitingText`; the header shows "Hub not set up" when the registry is missing. Unknown layout
+  types render an error card. Invalid-JSON reasons name the file.
+- Added `tests/session-worker.test.js` (Windows project folders counted in stats) and `tests/widgets.test.js` with a
+  tiny fake DOM, which cover part of the manual check: setup card, grey card with reason, broken file, failed Refresh
+  showing exit code and stderr, queue order and launch, agent status.
+
+**Pending:** Task 6 step 2, the Obsidian check on the PC with screenshots, could not run in the cloud. Check in
+particular that an action button opens a Windows Terminal tab in the project folder and that `claude "/review"`
+arrives with its quotes intact through `wt.exe` and `cmd /k`, and that Live Sessions shows a running session.
+
+**Not done here:** the MarketBrain-side `docs/README.md` and `docs/CHANGELOG.md` lines.
