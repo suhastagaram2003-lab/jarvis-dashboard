@@ -24,6 +24,8 @@ const proj = (label, queue = [], agents = [], color = "#00d4ff") => ({
 const errorProj = () => ({ entry: { name: "x", label: "X", color: "#fff", path: "C:\\x" },
   status: "error", reason: "no export yet", data: null });
 
+const staleProj = () => ({ ...proj("Old"), status: "stale", reason: "export 48h old" });
+
 test("example fixture validates", () => assert.deepEqual(store.validateExport(JSON.parse(fixture())), []));
 test("ok export", () => assert.equal(store.parseExport(fixture(), NOW).status, "ok"));
 test("stale export keeps data", () => {
@@ -76,3 +78,26 @@ test("waiting text", () => assert.deepEqual([0, 1, 3].map(store.waitingText),
 test("expandHome on Windows paths", () => assert.equal(store.expandHome("~\\.jarvis", "C:\\Users\\u"), "C:\\Users\\u\\.jarvis"));
 test("expandHome on posix paths", () => assert.equal(store.expandHome("~/.jarvis", "/home/u"), "/home/u/.jarvis"));
 
+
+test("card is grey for a stale export", () => assert.equal(store.projectCard(staleProj(), NOW).dot, "grey"));
+test("card is grey for a missing export", () => {
+  const c = store.projectCard(errorProj(), NOW);
+  assert.deepEqual([c.dot, c.reason, c.ageText, c.queueCount], ["grey", "no export yet", "", 0]);
+});
+test("card warns on a failed agent", () => assert.equal(store.projectCard(proj("MB", [], [agent({ status: "failed" })]), NOW).dot, "warn"));
+test("card warns on a missed agent", () => assert.equal(store.projectCard(proj("MB", [], [agent({ status: "missed" })]), NOW).dot, "warn"));
+test("card warns on lint errors", () => {
+  const p = proj("MB"); p.data.health = { ...p.data.health, lint_errors: 2 };
+  assert.equal(store.projectCard(p, NOW).dot, "warn");
+});
+test("healthy card", () => {
+  const c = store.projectCard(proj("MB", [item(1), item(2)], [agent()]), NOW);
+  assert.deepEqual([c.label, c.color, c.dot, c.queueCount, c.ageText, c.reason], ["MB", "#00d4ff", "ok", 2, "6h ago", ""]);
+});
+test("agent cards carry project color", () => assert.deepEqual(
+  store.agentCards([proj("MB", [], [agent({ name: "MarketBrain nightly" })], "#00d4ff")]).map(a => [a.name, a.color]),
+  [["MarketBrain nightly", "#00d4ff"]]));
+test("agent cards map fields and skip unusable projects", () => assert.deepEqual(
+  store.agentCards([proj("MB", [], [agent({ status: "failed" })]), errorProj()]),
+  [{ name: "nightly", displayName: "nightly", color: "#00d4ff", description: "Nightly ingest and lint",
+     status: "failed", last_run: "2026-10-23T05:00:00Z", project: "MB" }]));

@@ -2,7 +2,7 @@
 // Reads ~/.jarvis/registry.json and ~/.jarvis/projects/<name>.json; never writes anything.
 // ctx.hubSchema: the parsed schema/hub-export-v1.json (the loader reads it; tests pass it in).
 // Returns: { expandHome, validateExport, parseExport, loadRegistry, loadProjects, mergeQueue, waitingCount,
-//            waitingText }
+//            waitingText, projectCard, agentCards }
 
 const SCHEMA = ctx.hubSchema;
 const SUPPORTED_SCHEMA = 1;
@@ -142,4 +142,47 @@ function waitingCount(projects) {
   return projects.filter(usable).reduce((n, p) => n + (p.data.queue || []).length, 0);
 }
 
-return { expandHome, validateExport, parseExport, loadRegistry, loadProjects, mergeQueue, waitingCount, waitingText };
+// ── View models ──
+function ageText(iso, now) {
+  const ms = now.getTime() - Date.parse(iso);
+  if (!Number.isFinite(ms)) return "";
+  const h = Math.floor(ms / 3600000);
+  if (h < 1) return "just now";
+  if (h < 48) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
+function projectCard(p, now) {
+  const data = usable(p) ? p.data : null;
+  let dot = "ok";
+  if (p.status !== "ok" || !data) dot = "grey";
+  else if ((data.health?.lint_errors || 0) > 0
+    || (data.agents || []).some(a => a.status === "failed" || a.status === "missed")) dot = "warn";
+  return {
+    label: p.entry.label || p.entry.name,
+    color: p.entry.color,
+    dot,
+    queueCount: data ? (data.queue || []).length : 0,
+    ageText: data ? ageText(data.exported_at, now) : "",
+    reason: p.reason || "",
+  };
+}
+
+function agentCards(projects) {
+  const cards = [];
+  for (const p of projects) {
+    if (!usable(p)) continue;
+    for (const a of p.data.agents || []) {
+      cards.push({
+        name: a.name, displayName: a.name, color: p.entry.color, description: a.summary,
+        status: a.status, last_run: a.last_run, project: p.entry.label || p.entry.name,
+      });
+    }
+  }
+  return cards;
+}
+
+return {
+  expandHome, validateExport, parseExport, loadRegistry, loadProjects, mergeQueue, waitingCount, waitingText,
+  projectCard, agentCards,
+};

@@ -1,8 +1,8 @@
 // Agent Cards Widget — Orchestrator
-// Robot avatars, skills pills, status indicators
+// Robot avatars and a status dot from each agent's last run, built from every project's export (ctx.hub)
 // Returns: HTMLElement
 
-const { el, T, isNarrow, isWide, agents, agentCardRefs, createSectionTitle } = ctx;
+const { el, T, isNarrow, isWide, agentCardRefs, createSectionTitle, hubStore } = ctx;
 
 function loadSub(rel) {
   const code = ctx.nodeFs.readFileSync(
@@ -19,11 +19,8 @@ const section = el("div", {
   marginBottom: isNarrow ? "24px" : "40px",
 });
 
-// Title row
-section.appendChild(createSectionTitle("Active Agents", {
-  marginBottom: "20px",
-  badge: { text: `${agents.length} ONLINE` },
-}));
+const titleSlot = el("div");
+section.appendChild(titleSlot);
 
 // Grid
 const grid = el("div", {
@@ -33,12 +30,36 @@ const grid = el("div", {
 });
 section.appendChild(grid);
 
-// Build cards
-agents.forEach((agent, idx) => {
-  const result = createAgentCard(agent, idx);
-  grid.appendChild(result.el.card);
-  agentCardRefs.set(agent.name, { ...result.refs, setActive: result.setActive });
-});
+let lastKey = null;
+function render() {
+  const agents = hubStore.agentCards(ctx.hub.projects);
+  const key = JSON.stringify(agents);
+  if (key === lastKey) return; // unchanged: keep the cards (and their live "Working" state)
+  lastKey = key;
+  const attention = agents.filter(a => a.status === "failed" || a.status === "missed").length;
+  titleSlot.textContent = "";
+  titleSlot.appendChild(createSectionTitle("Agents", {
+    marginBottom: "20px",
+    badge: attention
+      ? { text: `${attention} NEED ATTENTION`, color: T.orange, bg: "rgba(255,107,53,0.1)" }
+      : { text: `${agents.length} AGENTS` },
+  }));
+  grid.textContent = "";
+  agentCardRefs.clear();
+  if (agents.length === 0) {
+    grid.appendChild(el("div", { fontSize: "13px", color: T.textMuted },
+      "No agents yet: they come from each project's export."));
+    return;
+  }
+  agents.forEach((agent, idx) => {
+    const result = createAgentCard(agent, idx);
+    grid.appendChild(result.el.card);
+    agentCardRefs.set(agent.name, { ...result.refs, setActive: result.setActive });
+  });
+}
+
+render();
+ctx.onHubUpdate.push(render);
 
 // Store grid ref for responsive resize
 ctx._agentsGrid = grid;

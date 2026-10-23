@@ -66,18 +66,11 @@ try {
 const hubStore = await loadModule("hub/hub-store.js")({ hubSchema });
 const jarvisHome = hubStore.expandHome(config.hub?.jarvisHome || "~/.jarvis", require("os").homedir());
 
-// ── Load registry ──
-const registryPath = config.widgets?.agentCards?.registryPath || "src/config/Jarvis-Registry";
-const dashboardFolder = currentFilePath.replace(/\/[^/]+$/, "");
-const fullRegistryPath = dashboardFolder + "/" + registryPath;
-const registry = dv.page(fullRegistryPath);
-const agents = registry?.agents || [];
+// ── Agents: come from every project's export (filled by ctx.hub.reload below) ──
+// agentNames is one shared Set, updated in place, so services that captured it stay current.
+const agents = [];
 const agentNames = new Set();
 const skillToAgent = new Map();
-agents.forEach(a => {
-  agentNames.add(a.name);
-  (a.skills || []).forEach(s => skillToAgent.set(s, a.name));
-});
 
 // ── Performance config shortcuts ──
 const perf = config.performance || {};
@@ -124,6 +117,9 @@ ctx.hub = {
     ctx.hub.projects = hubStore.loadProjects({ fs: nodeFs, jarvisHome, now });
     ctx.hub.queue = hubStore.mergeQueue(ctx.hub.projects);
     ctx.hub.waiting = hubStore.waitingCount(ctx.hub.projects);
+    ctx.agents = hubStore.agentCards(ctx.hub.projects);
+    agentNames.clear();
+    ctx.agents.forEach(a => agentNames.add(a.name));
     ctx.onHubUpdate.forEach(cb => { try { cb(ctx.hub); } catch (e) { console.error("Jarvis hub update:", e); } });
     return ctx.hub;
   },

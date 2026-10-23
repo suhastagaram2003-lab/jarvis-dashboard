@@ -1,9 +1,23 @@
 // Agent Card Factory
-// Single card with robot avatar, info, skills, memory freshness, and setActive() API
+// Single card with robot avatar, project chip, status dot from the last run, last run time, and setActive() API
+// Agent fields (from hubStore.agentCards): name, displayName, color, description, status, last_run, project, link
 // Returns: { createAgentCard }
 
 const { el, T, config, isNarrow, CARD_PAD, FONT_SM, animationsEnabled, addHoverEffect } = ctx;
-const editorApp = config.widgets?.communicationLink?.editorApp || "Cursor";
+
+const STATUS_COLOR = { ok: T.green, failed: T.red, missed: T.orange, idle: T.textMuted };
+
+function lastRunText(iso) {
+  if (!iso) return "never run";
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return "last run " + iso;
+  const mins = Math.floor((Date.now() - t) / 60000);
+  if (mins < 1) return "last run just now";
+  if (mins < 60) return `last run ${mins}m ago`;
+  const h = Math.floor(mins / 60);
+  if (h < 48) return `last run ${h}h ago`;
+  return `last run ${Math.floor(h / 24)}d ago`;
+}
 
 function loadSub(rel) {
   const code = ctx.nodeFs.readFileSync(
@@ -18,6 +32,8 @@ function createAgentCard(agent, idx) {
   const agentColor = agent.color || T.accent;
   const skills = agent.skills || [];
   const command = agent.command || "";
+  const status = agent.status || "idle";
+  const statusColor = STATUS_COLOR[status] || T.textMuted;
 
   const card = el("div", {
     background: T.panelBg, border: `1px solid ${T.panelBorder}`,
@@ -28,15 +44,12 @@ function createAgentCard(agent, idx) {
     cursor: "pointer",
     contain: "layout style",
   });
-  card.title = "Click to open agent config";
-
-  card.addEventListener("click", () => {
-    const filePath = agent.location === "global"
-      ? agent.configPath
-      : app.vault.adapter.basePath + "/" + agent.configPath;
-    ctx.osCompat.open(filePath);
-    new Notice("Opening " + agent.configPath);
-  });
+  if (agent.link) {
+    card.title = "Open " + agent.link;
+    card.addEventListener("click", () => ctx.osCompat.open(agent.link));
+  } else {
+    card.style.cursor = "default";
+  }
 
   card.addEventListener("mouseenter", () => {
     card.style.boxShadow = `0 0 20px ${agentColor}22, 0 4px 16px rgba(0,0,0,0.3)`;
@@ -108,23 +121,15 @@ function createAgentCard(agent, idx) {
     fontSize: isNarrow ? "14px" : "16px", fontWeight: "700", color: T.text,
   }, agent.displayName || agent.name));
 
-  nameRow.appendChild(el("span", {
-    fontSize: "9px", fontWeight: "700", letterSpacing: "1.5px",
-    color: T.purple, background: "rgba(124,107,255,0.12)",
-    padding: "2px 8px", borderRadius: "6px",
-    border: "1px solid rgba(124,107,255,0.2)",
-    textTransform: "uppercase",
-  }, (agent.model || "opus").toUpperCase()));
-
-  const isGlobal = agent.location === "global";
-  nameRow.appendChild(el("span", {
-    fontSize: "8px", fontWeight: "600", letterSpacing: "1px",
-    color: isGlobal ? T.orange : T.green,
-    background: isGlobal ? "rgba(255,107,53,0.1)" : "rgba(68,201,143,0.1)",
-    padding: "2px 6px", borderRadius: "4px",
-    border: `1px solid ${isGlobal ? "rgba(255,107,53,0.2)" : "rgba(68,201,143,0.2)"}`,
-    textTransform: "uppercase",
-  }, isGlobal ? "GLOBAL" : "VAULT"));
+  if (agent.project) {
+    nameRow.appendChild(el("span", {
+      fontSize: "9px", fontWeight: "700", letterSpacing: "1.5px",
+      color: agentColor, background: agentColor + "14",
+      padding: "2px 8px", borderRadius: "6px",
+      border: `1px solid ${agentColor}33`,
+      textTransform: "uppercase",
+    }, agent.project));
+  }
 
   // Status
   const statusBadge = el("div", {
@@ -134,17 +139,21 @@ function createAgentCard(agent, idx) {
 
   const sDot = el("span", {
     width: "6px", height: "6px", borderRadius: "50%",
-    background: T.green, display: "inline-block",
-    animation: animationsEnabled ? "jarvisPulse 1.5s ease-in-out infinite" : "none",
+    background: statusColor, display: "inline-block",
+    animation: animationsEnabled && status !== "idle" ? "jarvisPulse 1.5s ease-in-out infinite" : "none",
     willChange: animationsEnabled ? "transform, opacity" : "auto",
   });
   statusBadge.appendChild(sDot);
 
   const sText = el("span", {
     fontSize: "10px", fontWeight: "600", letterSpacing: "1.5px",
-    textTransform: "uppercase", color: T.green,
-  }, "Available");
+    textTransform: "uppercase", color: statusColor,
+  }, status);
   statusBadge.appendChild(sText);
+
+  const lastRun = el("span", { fontSize: "10px", color: T.textDim, marginLeft: "6px" }, lastRunText(agent.last_run));
+  lastRun.title = agent.last_run || "";
+  statusBadge.appendChild(lastRun);
 
   // Description
   infoCol.appendChild(el("div", {
@@ -221,10 +230,10 @@ function createAgentCard(agent, idx) {
       glowRing.style.display = "none";
       orbitDot.style.display = "none";
       robot.style.animation = animationsEnabled ? "jarvisBreathing 2.5s ease-in-out infinite" : "none";
-      sDot.style.background = T.green;
+      sDot.style.background = statusColor;
       sDot.style.boxShadow = "none";
-      sText.textContent = "Available";
-      sText.style.color = T.green;
+      sText.textContent = status;
+      sText.style.color = statusColor;
       card.style.borderColor = T.panelBorder;
       card.style.boxShadow = "none";
     }
