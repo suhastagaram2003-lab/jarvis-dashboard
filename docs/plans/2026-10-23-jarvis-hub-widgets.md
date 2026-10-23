@@ -241,3 +241,35 @@ test("walk stops at the cap", () => assert.equal(rec.recentFiles(fs, nodePath, [
 - [ ] **Step 3: Doc trail** — this plan's copy in the hub repo gets `## Outcome`; MarketBrain `docs/README.md` status
   and `docs/CHANGELOG.md` line.
 - [ ] **Step 4: Commit, push `feat/hub-widgets`, PR into the hub repo's `dev`** assigned to Lucky, with the screenshots.
+
+## Outcome
+
+Built on branch `feat/hub-widgets` of `suhastagaram2003-lab/jarvis-dashboard`, cut from `feat/hub-base` (the base PR
+was open, not merged), so its PR into `dev` follows the base PR.
+
+**Shipped:** Tasks 1 to 5 and the README "Hub fork" notes, with `npm test` at 110 passing tests. What We Learned,
+Fix Next, Metrics and Mission Control render the export feeds; the Ask box runs `claude -p "/ask ..."` without a
+shell, with `Read, Grep, Glob` plus the entry's `ask_tools` and the plan's deny list, and a 120 s timeout; Quick
+Capture writes only `~/.jarvis/inbox/<project>/<YYYY-MM-DD-HHMMSS>[-n].md`; sessions and System Diagnostics are split
+by `claude_projects_prefix`; Recent Activity walks only `recent_dirs` with a 2000-file cap.
+
+**Changed from the plan:**
+
+- `findClaude` follows the plan exactly: `hub.claudePath` when it exists, else `~\.local\bin\claude.exe`, else the
+  first `.exe` from `where claude`, else "claude.exe not found; set hub.claudePath". A configured path that does not
+  exist falls through without a message.
+- The folder scan for stats lives once in `src/hub/stats-scan.js`, shared by the worker and the main-thread stats
+  engine. Live Sessions still lists every Claude folder, with registered ones labelled by project; stats count only
+  registered projects (every Claude folder as "All projects" when there is no registry). Activity Analytics shows the
+  merged totals, not a per-project split.
+- `capture.js` also has `inboxCount` (the badge), refuses project names with path separators and retries on `EEXIST`.
+- The Task 5 test in the plan expected `["b", "a"]`, against its own rule that a smaller minutes-ago value is newer;
+  the test follows the rule.
+- Extra tests: fake-DOM smoke tests for every new widget, a POSIX run of the Ask box against a stand-in `claude` that
+  echoes its argument (quotes and `&` arrive as one argument), and a worker test for per-project stats.
+
+**Pending:** Task 6 step 2, the Obsidian check on the PC with the real MarketBrain export and screenshots (a cited
+answer from the Ask box, `& echo hi` treated as text, a capture imported by the nightly, Diagnostics rows, Recent
+Activity opening a wiki page), could not run in the cloud.
+
+**Not done here:** the MarketBrain-side `docs/README.md` and `docs/CHANGELOG.md` lines.

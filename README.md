@@ -18,15 +18,24 @@ plans: [docs/plans/](docs/plans/). The upstream README follows below this sectio
 - **New widgets:** Project Strip (a card per project with health dot, queue count, export age and a Refresh button
   that runs the project's `export_command` in its folder) and Waiting On You (every project's queue, oldest first,
   with action buttons). Agent Cards now come from the exports, with a status dot from each agent's last run. The
-  header says how many things wait on you.
+  header says how many things wait on you. What We Learned, Fix Next, Metrics and Mission Control show each export's
+  `learning`, `suggestions`, `metrics` and `links`.
+- **Ask box:** pick a project and ask; it runs `claude -p "/ask ..."` in the project folder without a shell, with only
+  `Read`, `Grep`, `Glob` and the project's own read-only MCP tools (`ask_tools`), and shows the cited answer and
+  the command. It needs `claude.exe` (the native install, or set `hub.claudePath` in `src/config/config.json`).
+- **Quick Capture** saves a dated note in the hub-owned inbox `~/.jarvis/inbox/<project>/`; each project's nightly
+  imports its own folder. The hub never writes into a project.
+- **By project:** Live Sessions labels sessions with their project (`claude_projects_prefix`, worktrees included),
+  System Diagnostics has a row per project (cache in `~/.jarvis/stats-cache.json`), and Recent Activity lists notes
+  from each project's `recent_dirs` and opens them in that project's vault.
 - **Windows port** (`src/core/os-compat.js`): `tasklist` instead of `pgrep`, Windows Terminal (`wt.exe`) instead of
-  `osascript`, `start` instead of `open -a`, and Claude's Windows project folders (`C--Users-...`) are recognised.
+  `osascript`, the Windows URL and file handler instead of `open -a`, and Claude's Windows project folders (`C--Users-...`) are recognised.
   Buttons run a command only on a click, in a new Windows Terminal tab in the project folder, and show the command in
   their tooltip.
 - **Sturdier loader:** config cascade (`config.example.json`, then `config.json`, then `config.local.json`), and a
   widget that throws shows a small red error card instead of hiding every widget after it.
-- **Layout:** Focus Timer, Quick Launch, Quick Capture and Voice Command are out of the default layout (Quick Capture
-  and a text command box return in a later plan). `macos/`, `ios/` and `companion/` are kept untouched and not built.
+- **Layout:** Focus Timer, Quick Launch and Voice Command are out of the default layout (voice returns in a later
+  phase). `macos/`, `ios/` and `companion/` are kept untouched and not built.
 - **Tests:** `npm test` (Node's built-in `node:test`, no dependencies).
 
 **Setup on Windows**
