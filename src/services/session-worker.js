@@ -1,12 +1,12 @@
 // Session Worker — runs heavy I/O in a background thread
-// Handles: session parsing, subagent scanning, pgrep, stats computation
+// Handles: session parsing, subagent scanning, process check, stats computation
 // Communicates with main thread via postMessage/onmessage
 
 const { parentPort, workerData } = require("worker_threads");
 const fs = require("fs");
 const path = require("path");
-const { execSync } = require("child_process");
 const os = require("os");
+const osCompat = new Function("ctx", fs.readFileSync(path.join(__dirname, "..", "core", "os-compat.js"), "utf8"))({ require });
 
 // ── Caches (persisted within worker lifetime) ──
 const sessionFileCache = new Map();
@@ -26,8 +26,7 @@ function expandHome(p) {
 function isClaudeProcessRunning(cacheMs) {
   if (Date.now() - _processCacheAt < cacheMs) return _processCache;
   try {
-    const out = execSync("pgrep -fa 'claude' 2>/dev/null || true", { encoding: "utf8", timeout: 3000 });
-    _processCache = out.split("\n").some(line => line.includes("/claude") && !line.includes("pgrep"));
+    _processCache = osCompat.hasClaudeProcess(osCompat.processListing());
   } catch { _processCache = false; }
   _processCacheAt = Date.now();
   return _processCache;
@@ -309,7 +308,7 @@ function computeStats(config) {
     try {
       const entries = fs.readdirSync(rootPath);
       for (const entry of entries) {
-        if (!entry.startsWith("-")) continue;
+        if (!osCompat.isClaudeProjectDir(entry)) continue;
         try {
           if (!fs.statSync(path.join(rootPath, entry)).isDirectory()) continue;
           const parts = entry.split("-").filter(Boolean);

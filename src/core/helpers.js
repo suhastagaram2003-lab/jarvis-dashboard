@@ -44,7 +44,7 @@ function describeAction(toolName, input, stopReason) {
     return "Thinking...";
   }
   const short = (s, n) => s && s.length > n ? s.slice(0, n) + "\u2026" : s;
-  const fname = (p) => p ? p.split("/").pop() : "file";
+  const fname = (p) => p ? p.split(/[\\/]/).pop() : "file";
   const map = {
     Read: () => `Reading ${fname(input?.file_path)}`,
     Edit: () => `Editing ${fname(input?.file_path)}`,

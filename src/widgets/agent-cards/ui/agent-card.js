@@ -34,8 +34,8 @@ function createAgentCard(agent, idx) {
     const filePath = agent.location === "global"
       ? agent.configPath
       : app.vault.adapter.basePath + "/" + agent.configPath;
-    require("child_process").exec(`open -a "${editorApp}" "${filePath}"`);
-    new Notice("Opening in " + editorApp + ": " + agent.configPath);
+    ctx.osCompat.open(filePath);
+    new Notice("Opening " + agent.configPath);
   });
 
   card.addEventListener("mouseenter", () => {

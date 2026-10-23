@@ -54,6 +54,9 @@ const { el, fmtTokens, fmtCost, formatModel, describeAction, getModelFamily, add
 // ── Load core: markdown renderer ──
 const markdownRenderer = await loadModule("core/markdown-renderer.js")({ el, T, config });
 
+// ── Load core: OS compat (Windows and macOS process, launch and open helpers) ──
+const osCompat = await loadModule("core/os-compat.js")({});
+
 // ── Load registry ──
 const registryPath = config.widgets?.agentCards?.registryPath || "src/config/Jarvis-Registry";
 const dashboardFolder = currentFilePath.replace(/\/[^/]+$/, "");
@@ -77,7 +80,7 @@ const ctx = {
   isNarrow, isMedium, isWide, leafEl,
   nodeFs, nodePath, CARD_PAD, FONT_SM,
   fmtTokens, fmtCost, formatModel, describeAction, getModelFamily, addHoverEffect, createSectionTitle,
-  markdownRenderer,
+  markdownRenderer, osCompat,
   agents, agentNames, skillToAgent,
   agentCardRefs: new Map(),
   onStatsReady: [],
