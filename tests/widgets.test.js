@@ -195,6 +195,21 @@ test("system diagnostics: one row per project", () => {
   assert.match(w.textContent, /MarketBrain 3 sessions 1\.5K tokens \$1\.25[\s\S]*BetBrain 0 sessions/);
 });
 
+test("recent activity: notes from the registered vaults, click opens the obsidian link", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const home = jarvisHome();
+  fs.mkdirSync(path.join(home, "vault", "wiki"), { recursive: true });
+  fs.writeFileSync(path.join(home, "vault", "wiki", "NVDA.md"), "# NVDA\n");
+  const { ctx } = makeCtx(home);
+  const opened = []; ctx.osCompat.open = (l) => opened.push(l);
+  const w = loadModule("widgets/recent-activity/index.js", ctx);
+  t.mock.timers.tick(200);
+  assert.match(w.textContent, /NVDA[\s\S]*MarketBrain/);
+  const row = w.findAll(n => n.title === "vault/wiki/NVDA.md")[0];
+  await row.click();
+  assert.equal(opened[0], "obsidian://open?vault=Suhas&file=vault%2Fwiki%2FNVDA");
+});
+
 test("header: waiting text from the hub", (t) => {
   t.mock.timers.enable({ apis: ["setInterval", "setTimeout"] }); // the clock and typing effect tick forever
   const { ctx } = makeCtx(jarvisHome());
