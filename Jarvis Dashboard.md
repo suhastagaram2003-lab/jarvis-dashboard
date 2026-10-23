@@ -36,8 +36,9 @@ function loadModule(relativePath) {
   return new _AsyncFunction("ctx", code);
 }
 
-// ── Load config ──
-const config = JSON.parse(nodeFs.readFileSync(nodePath.join(srcDir, "config", "config.json"), "utf8"));
+// ── Load config: config.example.json, then config.json, then config.local.json (each later one wins) ──
+const configCascade = await loadModule("core/config-cascade.js")({});
+const config = configCascade.loadConfig(nodeFs, srcDir);
 
 // ── Load core: theme ──
 const themeResult = await loadModule("core/theme.js")({ container, config });
@@ -56,6 +57,14 @@ const markdownRenderer = await loadModule("core/markdown-renderer.js")({ el, T, 
 
 // ── Load core: OS compat (Windows and macOS process, launch and open helpers) ──
 const osCompat = await loadModule("core/os-compat.js")({});
+
+// ── Load hub store (reads ~/.jarvis/registry.json and ~/.jarvis/projects/*.json; never writes) ──
+let hubSchema = null;
+try {
+  hubSchema = JSON.parse(nodeFs.readFileSync(nodePath.join(dashboardDir, "schema", "hub-export-v1.json"), "utf8"));
+} catch {}
+const hubStore = await loadModule("hub/hub-store.js")({ hubSchema });
+const jarvisHome = hubStore.expandHome(config.hub?.jarvisHome || "~/.jarvis", require("os").homedir());
 
 // ── Load registry ──
 const registryPath = config.widgets?.agentCards?.registryPath || "src/config/Jarvis-Registry";
@@ -84,6 +93,8 @@ const ctx = {
   agents, agentNames, skillToAgent,
   agentCardRefs: new Map(),
   onStatsReady: [],
+  onHubUpdate: [],
+  hubStore,
   intervals: [],
   cleanups: [],
   _paused: false,
@@ -103,6 +114,34 @@ const ctx = {
   },
 };
 
+// ── Hub state: set before widgets render; reload() re-reads the files and tells subscribers ──
+ctx.hub = {
+  jarvisHome,
+  projects: [], queue: [], waiting: 0, registryError: null,
+  reload() {
+    const now = new Date();
+    ctx.hub.registryError = hubStore.loadRegistry(nodeFs, jarvisHome).error;
+    ctx.hub.projects = hubStore.loadProjects({ fs: nodeFs, jarvisHome, now });
+    ctx.hub.queue = hubStore.mergeQueue(ctx.hub.projects);
+    ctx.hub.waiting = hubStore.waitingCount(ctx.hub.projects);
+    ctx.onHubUpdate.forEach(cb => { try { cb(ctx.hub); } catch (e) { console.error("Jarvis hub update:", e); } });
+    return ctx.hub;
+  },
+};
+ctx.hub.reload();
+{
+  const hubRefreshMs = config.hub?.refreshMs || 30000;
+  let hubTimer = null;
+  const startHub = () => {
+    if (hubTimer) return;
+    hubTimer = setInterval(() => ctx.hub.reload(), hubRefreshMs);
+    ctx.intervals.push(hubTimer);
+  };
+  const stopHub = () => { clearInterval(hubTimer); hubTimer = null; };
+  startHub();
+  ctx.registerPausable(() => { ctx.hub.reload(); startHub(); }, stopHub);
+}
+
 // ── Load services ──
 ctx.sessionParser = await loadModule("services/session-parser.js")(ctx);
 ctx.cleanups.push(() => { if (ctx.sessionParser.cleanup) ctx.sessionParser.cleanup(); });
@@ -118,22 +157,11 @@ ctx.cleanups.push(() => ctx.sessionManager.cleanup());
 
 // ── Load network client for remote voice mode ──
 if (config.widgets?.voiceCommand?.mode === "remote") {
+  // config.local.json is already merged into config by the cascade; the network client also reads it raw.
   let localConfig = {};
   try {
     localConfig = JSON.parse(nodeFs.readFileSync(
       nodePath.join(srcDir, "config", "config.local.json"), "utf8"));
-    function deepMerge(target, source) {
-      const result = { ...target };
-      for (const key of Object.keys(source)) {
-        if (source[key] && typeof source[key] === "object" && !Array.isArray(source[key])) {
-          result[key] = deepMerge(result[key] || {}, source[key]);
-        } else {
-          result[key] = source[key];
-        }
-      }
-      return result;
-    }
-    Object.assign(config, deepMerge(config, localConfig));
   } catch {}
   ctx._localConfig = localConfig;
   ctx.networkClient = await loadModule("services/network-client.js")(ctx);
@@ -168,6 +196,8 @@ if (config.dashboard?.showScanLine !== false) {
 // ── Widget map ──
 const WIDGET_MAP = {
   "header":                "widgets/header/index.js",
+  "project-strip":         "widgets/project-strip/index.js",
+  "waiting-on-you":        "widgets/waiting-on-you/index.js",
   "live-sessions":         "widgets/live-sessions/index.js",
   "system-diagnostics":    "widgets/system-diagnostics/index.js",
   "agent-cards":           "widgets/agent-cards/index.js",
@@ -191,16 +221,37 @@ const DEFERRED_WIDGETS = new Set([
 // ── Render layout ──
 const layout = config.layout || [
   { type: "header" },
+  { type: "project-strip" },
+  { type: "waiting-on-you" },
   { type: "live-sessions" },
-  { type: "row", columns: 2, widgets: ["focus-timer", "quick-capture"] },
   { type: "agent-cards" },
   { type: "communication-link" },
-  { type: "row", columns: 2, widgets: ["quick-launch", "mission-control"] },
   { type: "system-diagnostics" },
   { type: "activity-analytics" },
   { type: "recent-activity" },
   { type: "footer" },
 ];
+
+// ── Build one widget; a throw (or an unknown type) becomes a small red card in its slot ──
+function errorCard(message) {
+  const card = el("div", {
+    position: "relative", zIndex: "2",
+    background: "rgba(231,76,60,0.08)", border: "1px solid rgba(231,76,60,0.45)",
+    borderRadius: "8px", padding: "10px 14px", marginBottom: isNarrow ? "24px" : "40px",
+    color: T.red, fontSize: "12px", fontFamily: "'SF Mono', 'Fira Code', Consolas, monospace",
+    whiteSpace: "pre-wrap", wordBreak: "break-word",
+  }, "\u26a0 Widget failed \u2014 " + message);
+  return card;
+}
+async function buildWidget(widgetType) {
+  const rel = WIDGET_MAP[widgetType];
+  const r = await configCascade.safeWidget(widgetType, async () => {
+    if (!rel) throw new Error("unknown widget type");
+    return await loadModule(rel)(ctx);
+  });
+  if (r.error) console.error("Jarvis widget:", r.error);
+  return r.el ? { widget: r.el, failed: false } : { widget: errorCard(r.error), failed: true };
+}
 
 const gridRefs = [];
 
@@ -216,23 +267,21 @@ for (const entry of layout) {
       contain: "layout style",
     });
     for (const widgetType of entry.widgets) {
-      if (WIDGET_MAP[widgetType]) {
-        const widget = await loadModule(WIDGET_MAP[widgetType])(ctx);
-        if (widget.style) {
-          widget.style.marginBottom = "0";
-          widget.style.contain = "layout style";
-          if (DEFERRED_WIDGETS.has(widgetType)) {
-            widget.style.contentVisibility = "auto";
-          }
+      const { widget, failed } = await buildWidget(widgetType);
+      if (!failed && widget.style) {
+        widget.style.contain = "layout style";
+        if (DEFERRED_WIDGETS.has(widgetType)) {
+          widget.style.contentVisibility = "auto";
         }
-        row.appendChild(widget);
       }
+      if (widget.style) widget.style.marginBottom = "0";
+      row.appendChild(widget);
     }
     wrapper.appendChild(row);
     gridRefs.push({ el: row, columns: entry.columns || 2 });
-  } else if (WIDGET_MAP[entry.type]) {
-    const widget = await loadModule(WIDGET_MAP[entry.type])(ctx);
-    if (widget.style) {
+  } else {
+    const { widget, failed } = await buildWidget(entry.type);
+    if (!failed && widget.style) {
       widget.style.contain = "layout style";
       if (DEFERRED_WIDGETS.has(entry.type)) {
         widget.style.contentVisibility = "auto";

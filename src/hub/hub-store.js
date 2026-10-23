@@ -1,7 +1,8 @@
 // Hub Store — registry and export loading, validation and view models
 // Reads ~/.jarvis/registry.json and ~/.jarvis/projects/<name>.json; never writes anything.
 // ctx.hubSchema: the parsed schema/hub-export-v1.json (the loader reads it; tests pass it in).
-// Returns: { expandHome, validateExport, parseExport, loadRegistry, loadProjects, mergeQueue, waitingCount }
+// Returns: { expandHome, validateExport, parseExport, loadRegistry, loadProjects, mergeQueue, waitingCount,
+//            waitingText }
 
 const SCHEMA = ctx.hubSchema;
 const SUPPORTED_SCHEMA = 1;
@@ -132,8 +133,13 @@ function mergeQueue(projects) {
   return rows.sort((a, b) => (b.age_days || 0) - (a.age_days || 0));
 }
 
+function waitingText(n) {
+  if (!n) return "All clear";
+  return n === 1 ? "1 thing waits on you" : `${n} things wait on you`;
+}
+
 function waitingCount(projects) {
   return projects.filter(usable).reduce((n, p) => n + (p.data.queue || []).length, 0);
 }
 
-return { expandHome, validateExport, parseExport, loadRegistry, loadProjects, mergeQueue, waitingCount };
+return { expandHome, validateExport, parseExport, loadRegistry, loadProjects, mergeQueue, waitingCount, waitingText };

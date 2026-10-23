@@ -22,21 +22,22 @@
     "textMuted": "#6b7b8d",
     "textDim": "#3a4553"
   },
+  "hub": {
+    "jarvisHome": "~/.jarvis",
+    "refreshMs": 30000
+  },
   "projects": {
-    "mode": "manual",
+    "mode": "registry",
     "rootPath": "~/.claude/projects/",
-    "tracked": [
-      { "dir": "your-project-directory", "label": "My Project" }
-    ]
+    "tracked": []
   },
   "layout": [
     { "type": "header" },
-    { "type": "jarvis-voice-command" },
+    { "type": "project-strip" },
+    { "type": "waiting-on-you" },
     { "type": "live-sessions" },
-    { "type": "row", "columns": 2, "widgets": ["focus-timer", "quick-capture"] },
     { "type": "agent-cards" },
     { "type": "communication-link" },
-    { "type": "row", "columns": 2, "widgets": ["quick-launch", "mission-control"] },
     { "type": "system-diagnostics" },
     { "type": "activity-analytics" },
     { "type": "recent-activity" },

@@ -1,5 +1,5 @@
 // Header Widget — Orchestrator
-// Title, status, clock, typing subtitle, decorative line
+// Title, status ("N things wait on you" from ctx.hub), clock, typing subtitle, decorative line
 // Returns: HTMLElement
 
 const { el, T, isNarrow, perf } = ctx;
@@ -27,6 +27,16 @@ const statusLine = createStatusLine();
 section.appendChild(statusLine.el.row);
 // Expose update function so voice-command widget can set connection status
 ctx._statusLineUpdate = statusLine.update;
+
+// Hub status: "N things wait on you" / "All clear", refreshed on every hub reload
+if (ctx.hub && ctx.hubStore) {
+  const showWaiting = (hub) => {
+    if (hub.registryError) statusLine.setStatusText("Hub not set up", true);
+    else statusLine.setStatusText(ctx.hubStore.waitingText(hub.waiting), hub.waiting > 0);
+  };
+  showWaiting(ctx.hub);
+  ctx.onHubUpdate.push(showWaiting);
+}
 
 // Title + subtitle
 const titleDisplay = createTitleDisplay();

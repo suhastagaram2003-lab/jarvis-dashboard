@@ -71,6 +71,8 @@ test("queue merge sorts oldest first across projects", () => {
   assert.deepEqual(q.map(i => [i.project, i.age_days]), [["BetBrain", 5], ["MarketBrain", 1]]);
 });
 test("waiting count", () => assert.equal(store.waitingCount([proj("A", [item(1), item(2)]), errorProj()]), 2));
+test("waiting text", () => assert.deepEqual([0, 1, 3].map(store.waitingText),
+  ["All clear", "1 thing waits on you", "3 things wait on you"]));
 test("expandHome on Windows paths", () => assert.equal(store.expandHome("~\\.jarvis", "C:\\Users\\u"), "C:\\Users\\u\\.jarvis"));
 test("expandHome on posix paths", () => assert.equal(store.expandHome("~/.jarvis", "/home/u"), "/home/u/.jarvis"));
 
