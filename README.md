@@ -38,6 +38,10 @@ plans: [docs/plans/](docs/plans/). The upstream README follows below this sectio
   phase). `macos/`, `ios/` and `companion/` are kept untouched and not built.
 - **Tests:** `npm test` (Node's built-in `node:test`, no dependencies).
 
+**Jarvis web app** (`npm run app`): the same data as a local web page with tabs, where Execute on a task runs the
+right Claude process inside the app with a live log, permission buttons and Stop, plus Chat with a project's Claude.
+See [app/README.md](app/README.md).
+
 **Setup on Windows**
 
 1. Clone this repo to `C:\Users\<you>\Documents\Jarvis` and open the folder as an Obsidian vault.
