@@ -2,6 +2,44 @@
   <img src="https://raw.githubusercontent.com/AndrewKochulab/jarvis-dashboard/main/assets/banner.svg" alt="J.A.R.V.I.S. Dashboard" width="100%">
 </p>
 
+## Hub fork
+
+This fork turns Jarvis into one hub for several Claude projects (MarketBrain, BetBrain and any project added later),
+run as an Obsidian note on Windows. It is based on [AndrewKochulab/jarvis-dashboard](https://github.com/AndrewKochulab/jarvis-dashboard)
+at commit `ab4e274` (MIT; the licence and credit stay). Design: [docs/specs/2026-10-23-jarvis-hub-design.md](docs/specs/2026-10-23-jarvis-hub-design.md);
+plans: [docs/plans/](docs/plans/). The upstream README follows below this section.
+
+**What changed from upstream**
+
+- **Projects through status files.** The hub reads `~/.jarvis/registry.json` (one entry per project) and each
+  project's export `~/.jarvis/projects/<name>.json` (schema in [schema/hub-export-v1.json](schema/hub-export-v1.json)).
+  It never writes into a project folder. An export that is missing, older than 36 hours, of another schema version or
+  not valid JSON turns that project's card grey with the reason; the other projects still render.
+- **New widgets:** Project Strip (a card per project with health dot, queue count, export age and a Refresh button
+  that runs the project's `export_command` in its folder) and Waiting On You (every project's queue, oldest first,
+  with action buttons). Agent Cards now come from the exports, with a status dot from each agent's last run. The
+  header says how many things wait on you.
+- **Windows port** (`src/core/os-compat.js`): `tasklist` instead of `pgrep`, Windows Terminal (`wt.exe`) instead of
+  `osascript`, `start` instead of `open -a`, and Claude's Windows project folders (`C--Users-...`) are recognised.
+  Buttons run a command only on a click, in a new Windows Terminal tab in the project folder, and show the command in
+  their tooltip.
+- **Sturdier loader:** config cascade (`config.example.json`, then `config.json`, then `config.local.json`), and a
+  widget that throws shows a small red error card instead of hiding every widget after it.
+- **Layout:** Focus Timer, Quick Launch, Quick Capture and Voice Command are out of the default layout (Quick Capture
+  and a text command box return in a later plan). `macos/`, `ios/` and `companion/` are kept untouched and not built.
+- **Tests:** `npm test` (Node's built-in `node:test`, no dependencies).
+
+**Setup on Windows**
+
+1. Clone this repo to `C:\Users\<you>\Documents\Jarvis` and open the folder as an Obsidian vault.
+2. Install the Dataview community plugin and turn on **Enable JavaScript Queries** in its settings.
+3. Create `%USERPROFILE%\.jarvis\projects\`, copy `examples/registry.example.json` to
+   `%USERPROFILE%\.jarvis\registry.json` and replace each `<you>` with your Windows user name.
+4. Until a project's exporter exists, copy `examples/projects/marketbrain.json` to `%USERPROFILE%\.jarvis\projects\`
+   (set its `exported_at` to a recent time, or the card shows it as stale).
+5. Optional: put personal settings in `src/config/config.json` (gitignored); it only needs the keys you change.
+6. Open `Jarvis Dashboard.md`.
+
 <h1 align="center">J.A.R.V.I.S. Dashboard</h1>
 
 <p align="center">

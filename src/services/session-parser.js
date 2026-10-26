@@ -4,6 +4,7 @@
 // Returns: { getAllSessions, isClaudeProcessRunning, getTrackedProjects, cleanup }
 
 const { nodeFs, nodePath, config, agentNames, skillToAgent } = ctx;
+const osCompat = ctx.osCompat;
 
 // ── Worker setup ──
 let worker = null;
@@ -44,8 +45,7 @@ const PROCESS_CACHE_MS = config.performance?.processCheckCacheMs || 10000;
 
 // Seed cache synchronously once at init so the first call returns real status
 try {
-  const initOut = require("child_process").execSync("pgrep -fa 'claude' 2>/dev/null || true", { encoding: "utf8", timeout: 3000 });
-  _processCache = initOut.split("\n").some(line => line.includes("/claude") && !line.includes("pgrep"));
+  _processCache = osCompat.hasClaudeProcess(osCompat.processListing());
   _processCacheAt = Date.now();
 } catch { _processCache = false; _processCacheAt = Date.now(); }
 
@@ -68,7 +68,7 @@ function getTrackedProjects() {
   try {
     const entries = nodeFs.readdirSync(rootPath);
     for (const entry of entries) {
-      if (!entry.startsWith("-")) continue;
+      if (!osCompat.isClaudeProjectDir(entry)) continue;
       const fullPath = nodePath.join(rootPath, entry);
       try {
         const stat = nodeFs.statSync(fullPath);
@@ -92,15 +92,14 @@ function isClaudeProcessRunning() {
   if (!_processCheckInFlight) {
     _processCheckInFlight = true;
     try {
-      require("child_process").exec(
-        "pgrep -fa 'claude' 2>/dev/null || true",
-        { encoding: "utf8", timeout: 3000 },
+      const pc = osCompat.processCommand();
+      require("child_process").execFile(
+        pc.file, pc.args,
+        { encoding: "utf8", timeout: 3000, windowsHide: true },
         (err, stdout) => {
           _processCheckInFlight = false;
           if (!err && stdout) {
-            _processCache = stdout.split("\n").some(line =>
-              line.includes("/claude") && !line.includes("pgrep")
-            );
+            _processCache = osCompat.hasClaudeProcess(stdout);
           } else {
             _processCache = false;
           }
@@ -362,7 +361,7 @@ function getAllSessions() {
     let allDirs;
     try {
       allDirs = nodeFs.readdirSync(rootPath)
-        .filter(entry => entry.startsWith("-"));
+        .filter(entry => osCompat.isClaudeProjectDir(entry));
     } catch { allDirs = []; }
 
     // Ensure tracked projects are included even if readdirSync missed them

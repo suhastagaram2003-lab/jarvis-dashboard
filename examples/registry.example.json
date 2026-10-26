@@ -1,0 +1,26 @@
+{
+  "projects": [
+    {
+      "name": "marketbrain",
+      "label": "MarketBrain",
+      "path": "C:\\Users\\<you>\\Documents\\Suhas",
+      "color": "#00d4ff",
+      "export_command": "uv run --no-sync mb hub export --json",
+      "vault": "Suhas",
+      "claude_projects_prefix": "C--Users-<you>-Documents-Suhas",
+      "ask_tools": ["mcp__marketbrain__recall", "mcp__marketbrain__wiki_search", "mcp__marketbrain__wiki_get"],
+      "recent_dirs": ["vault/wiki"]
+    },
+    {
+      "name": "betbrain",
+      "label": "BetBrain",
+      "path": "C:\\Users\\<you>\\Documents\\BetBrain",
+      "color": "#44c98f",
+      "export_command": "uv run --no-sync bb hub export --json",
+      "vault": "BetBrain",
+      "claude_projects_prefix": "C--Users-<you>-Documents-BetBrain",
+      "ask_tools": [],
+      "recent_dirs": ["vault/wiki"]
+    }
+  ]
+}

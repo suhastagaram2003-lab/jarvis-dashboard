@@ -27,12 +27,7 @@ section.appendChild(createSectionTitle("Communication Link", { marginBottom: "20
 // Terminal panel
 const terminal = createTerminalDisplay(() => {
   const vaultPath = app.vault.adapter.basePath;
-  require("child_process").execFile("osascript", [
-    "-e", `tell application "${terminalApp}"`,
-    "-e", `do script "cd '${vaultPath}' && claude"`,
-    "-e", "activate",
-    "-e", "end tell"
-  ]);
+  ctx.osCompat.launch(vaultPath, null, terminalApp);
   new Notice("Launching Claude Code in " + terminalApp + "...");
 });
 section.appendChild(terminal.el.panel);

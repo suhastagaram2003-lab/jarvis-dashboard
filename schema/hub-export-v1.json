@@ -1,0 +1,275 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hub-export-v1.json",
+  "title": "Jarvis hub export, schema v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "project",
+    "exported_at",
+    "agents",
+    "queue",
+    "health",
+    "learning",
+    "suggestions",
+    "metrics",
+    "links"
+  ],
+  "properties": {
+    "schema": {
+      "const": 1
+    },
+    "project": {
+      "type": "string"
+    },
+    "exported_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "agents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "kind",
+          "status",
+          "last_run",
+          "next_run",
+          "summary",
+          "link"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "bot",
+              "skill",
+              "schedule"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "failed",
+              "missed",
+              "idle"
+            ]
+          },
+          "last_run": {
+            "type": "string"
+          },
+          "next_run": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "link": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "queue": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "title",
+          "age_days",
+          "action"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "proposal",
+              "failed-run",
+              "lint-error",
+              "pr"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "age_days": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "action": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "label",
+              "command"
+            ],
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "command": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "health": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lint_errors",
+        "lint_warnings",
+        "stale_pages",
+        "sources_unprocessed"
+      ],
+      "properties": {
+        "lint_errors": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lint_warnings": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "stale_pages": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sources_unprocessed": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "learning": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "date",
+          "kind",
+          "title",
+          "citation",
+          "link"
+        ],
+        "properties": {
+          "date": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "lesson",
+              "strategy-update",
+              "tune"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "citation": {
+            "type": "string"
+          },
+          "link": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "suggestions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "rank",
+          "title",
+          "why",
+          "source"
+        ],
+        "properties": {
+          "rank": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "title": {
+            "type": "string"
+          },
+          "why": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "tune",
+              "lint"
+            ]
+          }
+        }
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "label",
+          "value",
+          "trend",
+          "help"
+        ],
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "trend": {
+            "type": "string",
+            "enum": [
+              "up",
+              "down",
+              "flat"
+            ]
+          },
+          "help": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "links": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "label",
+          "url"
+        ],
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

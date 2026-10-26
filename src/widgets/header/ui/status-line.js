@@ -1,5 +1,5 @@
-// Status Line — Pulsing dot + "System Online" text
-// Returns: { createStatusLine }
+// Status Line — Pulsing dot + status text ("System Online", or the hub's "N things wait on you")
+// Returns: { createStatusLine }  →  { el: { row }, update(state), setStatusText(text, isAlert) }
 
 const { el, T, config, animationsEnabled } = ctx;
 const dashCfg = config.dashboard || {};
@@ -33,6 +33,10 @@ function createStatusLine() {
   }, dashCfg.statusText || "System Online");
   row.appendChild(label);
 
+  // Text and colour shown in the default (online) state; the header sets it from the hub.
+  let defaultText = dashCfg.statusText || "System Online";
+  let defaultColor = T.green;
+
   function update(state) {
     switch (state) {
       case "connected":
@@ -60,14 +64,20 @@ function createStatusLine() {
         label.textContent = "Disconnected";
         break;
       default:
-        dot.style.background = T.green;
+        dot.style.background = defaultColor;
         dot.style.animation = animationsEnabled ? "jarvisPulse 1.5s ease-in-out infinite" : "none";
-        label.style.color = T.green;
-        label.textContent = dashCfg.statusText || "System Online";
+        label.style.color = defaultColor;
+        label.textContent = defaultText;
     }
   }
 
-  return { el: { row }, update };
+  function setStatusText(text, isAlert) {
+    defaultText = text;
+    defaultColor = isAlert ? (T.orange || "#ff6b35") : T.green;
+    update("default");
+  }
+
+  return { el: { row }, update, setStatusText };
 }
 
 return { createStatusLine };
