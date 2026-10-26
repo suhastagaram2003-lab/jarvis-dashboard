@@ -27,3 +27,4 @@ ios/build/
 ios/DerivedData/
 ios/web/src
 ios/web/shared
+.superpowers/
