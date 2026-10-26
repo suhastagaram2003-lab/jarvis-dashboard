@@ -1,11 +1,11 @@
 // Quick Capture Widget — Orchestrator
-// Note capture to inbox folder with optional voice-to-text
+// Pick a project, write a note or paste a link: saved as a dated Markdown file in the hub-owned inbox
+// ~/.jarvis/inbox/<project>/ (src/hub/capture.js). Each project's nightly imports its own folder; the hub never
+// writes into a project. The mic stays hidden until the voice phase.
 // Returns: HTMLElement
 
-const { el, T, config, isNarrow, dv, nodeFs, nodePath, voiceService, addHoverEffect } = ctx;
-const captureCfg = config.widgets?.quickCapture || {};
-const targetFolder = captureCfg.targetFolder || "Inbox";
-const captureTag = captureCfg.tag || "inbox/capture";
+const { el, T, isNarrow, nodeFs, nodePath, addHoverEffect } = ctx;
+const inboxRoot = nodePath.join(ctx.hub.jarvisHome, "inbox");
 
 function loadSub(rel) {
   const code = nodeFs.readFileSync(
@@ -15,7 +15,7 @@ function loadSub(rel) {
 }
 
 const { createCaptureInput } = loadSub("ui/capture-input.js");
-const { createMicButton } = loadSub("ui/mic-button.js");
+const capture = new Function("ctx", nodeFs.readFileSync(nodePath.join(ctx._srcDir, "hub", "capture.js"), "utf8"))(ctx);
 
 const section = el("div", {
   background: T.panelBg, border: `1px solid ${T.panelBorder}`,
@@ -39,18 +39,50 @@ const titleRow = el("div", {
 });
 titleRow.appendChild(el("span", {}, "Quick Capture"));
 
-let noteCount = 0;
-try { noteCount = dv.pages(`"${targetFolder}"`).length; } catch {}
-
-titleRow.appendChild(el("span", {
+const badge = el("span", {
   fontSize: "9px", fontWeight: "600", color: T.purple,
   background: "rgba(124,107,255,0.1)",
   padding: "2px 8px", borderRadius: "8px", letterSpacing: "1px",
-}, `${noteCount} IN ${targetFolder.toUpperCase()}`));
+});
+titleRow.appendChild(badge);
 section.appendChild(titleRow);
 
+// Project picker
+const picker = el("select", {
+  background: "rgba(0,0,0,0.3)", color: T.text, border: `1px solid ${T.panelBorder}`, borderRadius: "6px",
+  padding: "6px 8px", fontSize: "12px", marginBottom: "10px", fontFamily: "inherit",
+});
+section.appendChild(picker);
+
+function entries() {
+  return (ctx.hub.projects || []).map(p => p.entry);
+}
+function selected() {
+  return entries().find(e => e.name === picker.value) || entries()[0] || null;
+}
+function updateBadge() {
+  const e = selected();
+  badge.textContent = e ? `${capture.inboxCount(nodeFs, inboxRoot, e.name)} IN ${(e.label || e.name).toUpperCase()} INBOX` : "NO PROJECTS";
+}
+function renderPicker() {
+  const current = picker.value;
+  picker.textContent = "";
+  for (const e of entries()) {
+    const opt = document.createElement("option");
+    opt.value = e.name;
+    opt.textContent = e.label || e.name;
+    picker.appendChild(opt);
+  }
+  if (current && entries().some(e => e.name === current)) picker.value = current;
+  else if (entries()[0]) picker.value = entries()[0].name;
+  updateBadge();
+}
+picker.addEventListener("change", updateBadge);
+renderPicker();
+ctx.onHubUpdate.push(renderPicker);
+
 // Textarea
-const captureInput = createCaptureInput("Capture a thought...");
+const captureInput = createCaptureInput("Capture a thought or paste a link...");
 section.appendChild(captureInput.el.input);
 
 // Button row
@@ -87,64 +119,18 @@ addHoverEffect(btn, {
   background: "rgba(124,107,255,0.06)",
 });
 
-// Voice mic button
-if (voiceService.isAvailable) {
-  const micButton = createMicButton(voiceService, (text) => {
-    const existing = captureInput.getValue();
-    const sep = existing.length > 0 && !existing.endsWith(" ") && !existing.endsWith("\n") ? " " : "";
-    captureInput.setValue(existing + sep + text);
-    captureInput.el.input.scrollTop = captureInput.el.input.scrollHeight;
-  });
-  buttonRow.appendChild(micButton.el.btn);
-
-  // Safety-net cleanup
-  const cleanupMs = ctx.perf?.cleanupIntervalMs || 5000;
-  let cleanupId = setInterval(() => {
-    if (!document.contains(section)) {
-      voiceService.cleanup();
-      clearInterval(cleanupId);
-    }
-  }, cleanupMs);
-  ctx.intervals.push(cleanupId);
-
-  ctx.registerPausable(
-    () => {
-      cleanupId = setInterval(() => {
-        if (!document.contains(section)) {
-          voiceService.cleanup();
-          clearInterval(cleanupId);
-        }
-      }, cleanupMs);
-      ctx.intervals.push(cleanupId);
-    },
-    () => { clearInterval(cleanupId); }
-  );
-}
-
 btn.addEventListener("click", () => {
-  if (voiceService.getState() === "recording") {
-    voiceService.cancelRecording();
-  }
-  if (voiceService.getState() === "transcribing") {
-    new Notice("Wait for transcription to finish.");
-    return;
-  }
-
-  const text = captureInput.getValue().trim();
-  if (!text) { new Notice("Nothing to capture \u2014 type something first."); return; }
-  const now = new Date();
-  const dateStr = now.toISOString().slice(0, 10);
-  const timeStr = String(now.getHours()).padStart(2, "0") + String(now.getMinutes()).padStart(2, "0");
-  const fileName = `Quick Capture ${dateStr} ${timeStr}.md`;
-  const vaultBase = app.vault.adapter.basePath;
-  const filePath = nodePath.join(vaultBase, targetFolder, fileName);
-  const content = `---\ntags:\n  - ${captureTag}\ndate: ${dateStr}\n---\n\n${text}\n`;
+  const entry = selected();
+  if (!entry) { new Notice("No project to capture to: set up ~/.jarvis/registry.json first."); return; }
   try {
-    nodeFs.writeFileSync(filePath, content);
+    const file = capture.save(nodeFs, inboxRoot, entry.name, captureInput.getValue(), new Date());
     captureInput.clear();
-    new Notice(`Captured to ${targetFolder}`);
+    updateBadge();
+    new Notice(`Captured for ${entry.label || entry.name}: ${nodePath.basename(file)}`);
   } catch (e) {
-    new Notice("Capture failed: " + e.message);
+    new Notice(e.message === "nothing to capture"
+      ? "Nothing to capture \u2014 type something first."
+      : "Capture failed: " + e.message);
   }
 });
 

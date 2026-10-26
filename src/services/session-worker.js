@@ -6,7 +6,10 @@ const { parentPort, workerData } = require("worker_threads");
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
-const osCompat = new Function("ctx", fs.readFileSync(path.join(__dirname, "..", "core", "os-compat.js"), "utf8"))({ require });
+const loadSrc = (rel, ctx) => new Function("ctx", fs.readFileSync(path.join(__dirname, "..", rel), "utf8"))(ctx);
+const osCompat = loadSrc("core/os-compat.js", { require });
+const hubStore = loadSrc("hub/hub-store.js", { require, hubSchema: null });
+const statsScan = loadSrc("hub/stats-scan.js", { require });
 
 // ── Caches (persisted within worker lifetime) ──
 const sessionFileCache = new Map();
@@ -351,6 +354,23 @@ function computeStats(config) {
   return aggregateStats(newCache);
 }
 
+// Per-project stats over every folder of every registered project (src/hub/stats-scan.js)
+function computeProjectStats(config, entries, cachePath) {
+  const pricing = config.pricing || {
+    opus: { input: 15, output: 75 },
+    sonnet: { input: 3, output: 15 },
+    haiku: { input: 0.80, output: 4 },
+  };
+  return statsScan.scanProjectStats({
+    fs, path, rootPath: expandHome(config.projects.rootPath), entries, cachePath,
+    periodDays: config.widgets?.systemDiagnostics?.periodDays || 30,
+    cacheMs: config.widgets?.systemDiagnostics?.cacheDurationMs || 300000,
+    parseFullSession: (fp) => parseFullSession(fp, pricing), aggregateStats,
+    isClaudeProjectDir: osCompat.isClaudeProjectDir, projectForDir: hubStore.projectForDir,
+    mergeStats: hubStore.mergeStats, now: Date.now(),
+  });
+}
+
 function aggregateStats(cache) {
   const entries = Object.values(cache.sessions);
   let totalSessions = entries.length;
@@ -465,7 +485,9 @@ parentPort.on("message", (msg) => {
     }
 
     if (msg.type === "computeStats") {
-      const stats = computeStats(msg.config);
+      const stats = msg.cachePath
+        ? computeProjectStats(msg.config, msg.entries || [], msg.cachePath)
+        : computeStats(msg.config);
       parentPort.postMessage({ type: "stats", stats });
     }
   } catch (e) {

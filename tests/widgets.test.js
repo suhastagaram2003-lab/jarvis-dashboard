@@ -111,6 +111,105 @@ test("agent cards: one card per exported agent with status", () => {
   assert.equal(ctx.agentCardRefs.get("ORB bot").sText.textContent, "ok");
 });
 
+test("what we learned: fixture lesson, click opens its link", async () => {
+  const { ctx } = makeCtx(jarvisHome());
+  const opened = []; ctx.osCompat.open = (t) => opened.push(t);
+  const w = loadModule("widgets/what-we-learned/index.js", ctx);
+  assert.match(w.textContent, /Wide opening ranges fail more often/);
+  const row = w.findAll(n => /^Open obsidian:/.test(n.title))[0];
+  await row.click();
+  assert.match(opened[0], /^obsidian:\/\/open\?vault=Suhas/);
+});
+
+test("fix next, metrics and mission control show the fixture; empty states without a registry", () => {
+  const { ctx } = makeCtx(jarvisHome());
+  assert.match(loadModule("widgets/fix-next/index.js", ctx).textContent, /#1[\s\S]*Split the nightly report/);
+  assert.match(loadModule("widgets/hub-metrics/index.js", ctx).textContent, /\+1\.8%[\s\S]*ORB paper P&L/);
+  assert.match(loadModule("widgets/mission-control/index.js", ctx).textContent, /MarketBrain[\s\S]*Vault/);
+  const empty = makeCtx(jarvisHome({ registry: false })).ctx;
+  assert.match(loadModule("widgets/what-we-learned/index.js", empty).textContent, /Nothing new in 14 days/);
+  assert.match(loadModule("widgets/fix-next/index.js", empty).textContent, /No suggestions/);
+  assert.match(loadModule("widgets/hub-metrics/index.js", empty).textContent, /No metrics yet/);
+  assert.match(loadModule("widgets/mission-control/index.js", empty).textContent, /No links yet/);
+});
+
+test("command box: a question with & and quotes reaches claude as one argument", { skip: process.platform === "win32" }, async () => {
+  const { ctx } = makeCtx(jarvisHome());
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), "jarvis-claude-"));
+  const fake = path.join(bin, "claude");
+  fs.writeFileSync(fake, "#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({ result: 'got: ' + process.argv[3] + ' cwd-ok:' + (process.cwd().length > 0), is_error: false }));\n");
+  fs.chmodSync(fake, 0o755);
+  ctx.config = { ...ctx.config, hub: { ...ctx.config.hub, claudePath: fake } };
+  ctx.markdownRenderer = { renderMarkdown: (t) => { const d = document.createElement("div"); d.textContent = t; return d; } };
+  const w = loadModule("widgets/command-box/index.js", ctx);
+  const [area] = w.findAll(n => n.tagName === "TEXTAREA");
+  area.value = 'what about "ORB" & echo hi';
+  await buttons(w).find(b => b.textContent === "Ask").click();
+  assert.match(w.textContent, /got: \/ask what about "ORB" & echo hi cwd-ok:true/);
+  assert.match(w.textContent, /--disallowedTools Bash,PowerShell/);
+});
+
+test("command box: missing claude shows the setup hint", async () => {
+  const { ctx } = makeCtx(jarvisHome());
+  ctx.config = { ...ctx.config, hub: { claudePath: "/nope/claude.exe" } };
+  const w = loadModule("widgets/command-box/index.js", { ...ctx, require: (m) => m === "child_process"
+    ? { ...require("child_process"), execFileSync: () => "" }
+    : m === "os" ? { ...require("os"), homedir: () => "/nonexistent-home" } : require(m) });
+  const [area] = w.findAll(n => n.tagName === "TEXTAREA");
+  area.value = "q";
+  await buttons(w).find(b => b.textContent === "Ask").click();
+  assert.match(w.textContent, /claude\.exe not found; set hub\.claudePath/);
+});
+
+test("quick capture: writes the picked project's inbox and nothing else", async () => {
+  const home = jarvisHome();
+  const { ctx } = makeCtx(home);
+  const notices = [];
+  globalThis.Notice = class { constructor(m) { notices.push(m); } };
+  const w = loadModule("widgets/quick-capture/index.js", ctx);
+  assert.match(w.textContent, /0 IN MARKETBRAIN INBOX/);
+  const [picker] = w.findAll(n => n.tagName === "SELECT");
+  picker.value = "betbrain";
+  const [area] = w.findAll(n => n.tagName === "TEXTAREA");
+  area.value = "https://example.com/line-movement";
+  const btn = w.findAll(n => (n._listeners.click || []).length > 0 && /Capture/.test(n.textContent))[0];
+  await btn.click();
+  const files = fs.readdirSync(path.join(home, "inbox", "betbrain"));
+  assert.equal(files.length, 1);
+  assert.match(files[0], /^\d{4}-\d{2}-\d{2}-\d{6}\.md$/);
+  assert.equal(fs.existsSync(path.join(home, "inbox", "marketbrain")), false);
+  assert.equal(area.value, "");
+  assert.match(notices[0], /Captured for BetBrain/);
+  delete globalThis.Notice;
+});
+
+test("system diagnostics: one row per project", () => {
+  const { ctx } = makeCtx(jarvisHome());
+  ctx.onStatsReady = [];
+  const w = loadModule("widgets/system-diagnostics/index.js", ctx);
+  const merged = ctx.hubStore.mergeStats([
+    { project: "MarketBrain", stats: { totalSessions: 3, totalTokens: 1500, totalCost: 1.25, modelBreakdown: [] } },
+    { project: "BetBrain", stats: { totalSessions: 0, totalTokens: 0, totalCost: 0, modelBreakdown: [] } },
+  ]);
+  ctx.onStatsReady.forEach(cb => cb(merged));
+  assert.match(w.textContent, /MarketBrain 3 sessions 1\.5K tokens \$1\.25[\s\S]*BetBrain 0 sessions/);
+});
+
+test("recent activity: notes from the registered vaults, click opens the obsidian link", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const home = jarvisHome();
+  fs.mkdirSync(path.join(home, "vault", "wiki"), { recursive: true });
+  fs.writeFileSync(path.join(home, "vault", "wiki", "NVDA.md"), "# NVDA\n");
+  const { ctx } = makeCtx(home);
+  const opened = []; ctx.osCompat.open = (l) => opened.push(l);
+  const w = loadModule("widgets/recent-activity/index.js", ctx);
+  t.mock.timers.tick(200);
+  assert.match(w.textContent, /NVDA[\s\S]*MarketBrain/);
+  const row = w.findAll(n => n.title === "vault/wiki/NVDA.md")[0];
+  await row.click();
+  assert.equal(opened[0], "obsidian://open?vault=Suhas&file=vault%2Fwiki%2FNVDA");
+});
+
 test("header: waiting text from the hub", (t) => {
   t.mock.timers.enable({ apis: ["setInterval", "setTimeout"] }); // the clock and typing effect tick forever
   const { ctx } = makeCtx(jarvisHome());

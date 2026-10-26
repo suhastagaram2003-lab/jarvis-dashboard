@@ -194,6 +194,10 @@ const WIDGET_MAP = {
   "header":                "widgets/header/index.js",
   "project-strip":         "widgets/project-strip/index.js",
   "waiting-on-you":        "widgets/waiting-on-you/index.js",
+  "what-we-learned":       "widgets/what-we-learned/index.js",
+  "fix-next":              "widgets/fix-next/index.js",
+  "hub-metrics":           "widgets/hub-metrics/index.js",
+  "command-box":           "widgets/command-box/index.js",
   "live-sessions":         "widgets/live-sessions/index.js",
   "system-diagnostics":    "widgets/system-diagnostics/index.js",
   "agent-cards":           "widgets/agent-cards/index.js",
@@ -217,13 +221,17 @@ const DEFERRED_WIDGETS = new Set([
 // ── Render layout ──
 const layout = config.layout || [
   { type: "header" },
+  { type: "row", columns: 2, widgets: ["command-box", "quick-capture"] },
   { type: "project-strip" },
   { type: "waiting-on-you" },
+  { type: "what-we-learned" },
+  { type: "row", columns: 2, widgets: ["fix-next", "hub-metrics"] },
   { type: "live-sessions" },
   { type: "agent-cards" },
   { type: "communication-link" },
   { type: "system-diagnostics" },
   { type: "activity-analytics" },
+  { type: "mission-control" },
   { type: "recent-activity" },
   { type: "footer" },
 ];
