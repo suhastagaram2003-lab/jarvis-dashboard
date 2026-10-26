@@ -382,5 +382,6 @@ const ro = new ResizeObserver(() => {
   });
 });
 ro.observe(resizeTarget);
-} // end __jarvis__ block
+// end __jarvis__ block (no comment after the brace: Dataview appends " })()" on the same line)
+}
 ```
