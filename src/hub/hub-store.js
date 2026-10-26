@@ -66,6 +66,11 @@ function check(node, v, at, errors) {
   }
 }
 
+// PowerShell 5.1's "-Encoding UTF8" writes a byte order mark, which JSON.parse rejects.
+function stripBom(text) {
+  return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+}
+
 function validateExport(obj) {
   if (!SCHEMA) return ["hub schema not loaded"];
   const errors = [];
@@ -76,7 +81,7 @@ function validateExport(obj) {
 function parseExport(text, now, maxAgeHours = 36) {
   if (text === null || text === undefined) return { status: "error", reason: "no export yet", data: null };
   let obj;
-  try { obj = JSON.parse(text); } catch (e) {
+  try { obj = JSON.parse(stripBom(text)); } catch (e) {
     return { status: "error", reason: `invalid JSON: ${e.message}`, data: null };
   }
   if (obj && typeof obj === "object" && obj.schema !== SUPPORTED_SCHEMA) {
@@ -98,7 +103,7 @@ function loadRegistry(fs, jarvisHome) {
     return { projects: [], error: `no registry: copy examples/registry.example.json to ${file}` };
   }
   try {
-    const reg = JSON.parse(text);
+    const reg = JSON.parse(stripBom(text));
     if (!reg || !Array.isArray(reg.projects)) return { projects: [], error: `${file}: "projects" must be a list` };
     return { projects: reg.projects, error: null };
   } catch (e) {
