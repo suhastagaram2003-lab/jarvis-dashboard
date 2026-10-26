@@ -81,6 +81,16 @@ test("registry and exports load, a broken project does not hide the others", () 
   assert.equal(ps[1].reason, "no export yet");
   assert.match(ps[2].reason, /^broken\.json: invalid JSON/);
 });
+test("a byte order mark from PowerShell does not break the registry or an export", () => {
+  const home = tmpDir();
+  fs.mkdirSync(path.join(home, "projects"));
+  fs.writeFileSync(path.join(home, "registry.json"), "\ufeff" + JSON.stringify({ projects: [
+    { name: "marketbrain", label: "MarketBrain", path: "C:\\mb", color: "#00d4ff" },
+  ] }));
+  fs.writeFileSync(path.join(home, "projects", "marketbrain.json"), "\ufeff" + fixture());
+  assert.equal(store.loadRegistry(fs, home).error, null);
+  assert.equal(store.loadProjects({ fs, jarvisHome: home, now: NOW })[0].status, "ok");
+});
 test("queue merge sorts oldest first across projects", () => {
   const q = store.mergeQueue([proj("MarketBrain", [item(1)]), proj("BetBrain", [item(5)]), errorProj()]);
   assert.deepEqual(q.map(i => [i.project, i.age_days]), [["BetBrain", 5], ["MarketBrain", 1]]);
