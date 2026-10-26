@@ -28,3 +28,6 @@ ios/DerivedData/
 ios/web/src
 ios/web/shared
 .superpowers/
+
+# Web app browser check output
+app/scripts/out/
