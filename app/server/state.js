@@ -57,4 +57,9 @@ function buildState({ fs, jarvisHome, now = new Date(), runsByItem = {} }) {
   };
 }
 
-module.exports = { buildState };
+// The registry entry (with its path) for a project name, for the server only.
+function entryFor(fs, jarvisHome, name) {
+  return store.loadRegistry(fs, jarvisHome).projects.find(e => e && e.name === name) || null;
+}
+
+module.exports = { buildState, entryFor };
