@@ -66,3 +66,24 @@ test("claudeArgs resumes, streams and blocks the order tools", () => {
   assert.match(a[a.indexOf("--disallowedTools") + 1], /mcp__alpaca__place_stock_order/);
   assert.ok(!claudeArgs({}).includes("--resume"));
 });
+
+test("a claude that exits before reading stdin does not crash the server", async () => {
+  const r = run("x".repeat(4 * 1024 * 1024), { FAKE_FAIL: "1" });
+  const exit = await r.exited;
+  assert.equal(exit.code, 3);
+  r.proc.send("more after exit");
+  await new Promise(res => setTimeout(res, 100));
+});
+
+test("a multibyte character split across chunks arrives whole", async () => {
+  const r = run("/x", { FAKE_SPLIT: "1" });
+  await r.exited;
+  assert.equal(r.events.filter(e => e.type === "text").map(e => e.text).join(""), "é—");
+});
+
+test("claudeArgs refuses a session id that could be read as a flag", () => {
+  assert.throws(() => claudeArgs({ sessionId: "--dangerously-skip-permissions" }), /session id/);
+  assert.throws(() => claudeArgs({ sessionId: "a b" }), /session id/);
+  assert.deepEqual(claudeArgs({ sessionId: "0f8c2a3e-1b2c-4d5e-8f90-123456789abc" }).slice(0, 2),
+    ["--resume", "0f8c2a3e-1b2c-4d5e-8f90-123456789abc"]);
+});

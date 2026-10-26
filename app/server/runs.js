@@ -6,6 +6,11 @@ const crypto = require("crypto");
 const path = require("path");
 const { claudeArgs, childEnv, killTree } = require("./claude-process");
 
+// Server-side backstop for the deny list: an ask for any order, position, exercise or account-changing tool is
+// denied here and never shown, whatever MCP prefix the tool has on this PC.
+const ORDER_TOOL = /(^|__)((place|cancel|replace|review|preview)_\w*orders?(_by_id)?|close_(all_)?positions?|(do_not_)?exercise_\w*|cancel_option_exercise|decline_trade_approval|update_account_config)$/i;
+const isOrderTool = (name) => ORDER_TOOL.test(String(name || ""));
+
 const LIMIT_TEXT = (n) => `${n} runs are going; wait for one to finish or stop one`;
 const LIVE = new Set(["running", "waiting", "stalled"]);
 const pad = (n) => String(n).padStart(2, "0");
@@ -22,10 +27,13 @@ function startShell({ command, cwd, env, onEvent, timeoutMs = 120000 }) {
   let done = false;
   const bufs = { out: "", err: "" };
   const feed = (key, type) => (d) => {
-    const parts = (bufs[key] + d.toString("utf8")).split(/\r?\n/);
+    const parts = (bufs[key] + d).split(/\r?\n/);
     bufs[key] = parts.pop();
     for (const line of parts) if (line.trim()) onEvent({ type, text: line });
   };
+  child.stdin.on("error", () => {});
+  child.stdout.setEncoding("utf8");
+  child.stderr.setEncoding("utf8");
   child.stdout.on("data", feed("out", "text"));
   child.stderr.on("data", feed("err", "stderr"));
   const timer = setTimeout(() => {
@@ -88,6 +96,11 @@ function createRunManager({ jarvisHome, fs, startProcess, claude, env, now = () 
   }
 
   function onEvent(run, event) {
+    if (event.type === "permission" && isOrderTool(event.tool)) {
+      record(run, { type: "answer", request_id: event.request_id, allow: false, auto: true, tool: event.tool });
+      if (run.proc) run.proc.answer(event.request_id, false);
+      return;
+    }
     record(run, event);
     const s = run.summary;
     if (s.status === "stalled" && event.type !== "exit") setStatus(run, run.asks.size ? "waiting" : "running");
@@ -106,13 +119,21 @@ function createRunManager({ jarvisHome, fs, startProcess, claude, env, now = () 
       }
       run.stopping = false;
       run.failedResult = null;
-      setStatus(run, status, { ended: iso(), error });
+      const queued = run.queued;
+      run.queued = [];
+      if (queued.length && status === "done" && run.summary.session_id) {
+        // Lucky replied while the last turn was closing: answer it in a resumed process.
+        spawnFor(run, queued.join("\n\n"), run.summary.session_id, true);
+        setStatus(run, "running");
+      } else {
+        setStatus(run, status, { ended: iso(), error });
+      }
     }
   }
 
-  function spawnFor(run, prompt, sessionId) {
+  function spawnFor(run, prompt, sessionId, alreadyRecorded = false) {
     record(run, { type: "process", resume: sessionId || null });
-    record(run, { type: "user", text: prompt });
+    if (!alreadyRecorded) record(run, { type: "user", text: prompt });
     run.proc = startProcess({
       file: claude.file, args: [...(claude.prefixArgs || []), ...claudeArgs({ sessionId })],
       cwd: run.cwd, prompt, env, onEvent: (e) => onEvent(run, e),
@@ -137,7 +158,7 @@ function createRunManager({ jarvisHome, fs, startProcess, claude, env, now = () 
     const run = {
       summary: { id, kind, project, label, item_id, title, started: iso(), ended: null, status: "running",
         session_id: sessionId, error: null },
-      events: [], proc: null, subs: new Set(), asks: new Map(), stderr: [], cwd,
+      events: [], proc: null, subs: new Set(), asks: new Map(), stderr: [], cwd, queued: [],
       lastEventAt: now().getTime(), stopping: false, failedResult: null,
     };
     runs.set(id, run);
@@ -159,6 +180,11 @@ function createRunManager({ jarvisHome, fs, startProcess, claude, env, now = () 
 
   function reply(id, text) {
     const run = need(id);
+    if (run.proc && run.proc.accepting && !run.proc.accepting()) {
+      record(run, { type: "user", text });
+      run.queued.push(text); // sent to a resumed process when this one exits
+      return { ...run.summary };
+    }
     if (run.proc) {
       record(run, { type: "user", text });
       run.proc.send(text);
@@ -225,7 +251,9 @@ function createRunManager({ jarvisHome, fs, startProcess, claude, env, now = () 
   function tick() {
     const t = now().getTime();
     for (const run of runs.values()) {
-      if (run.proc && run.summary.status !== "stalled" && t - run.lastEventAt >= stallMs) setStatus(run, "stalled");
+      if (run.proc && !run.asks.size && run.summary.status !== "stalled" && t - run.lastEventAt >= stallMs) {
+        setStatus(run, "stalled");
+      }
     }
   }
 
@@ -240,4 +268,4 @@ function createRunManager({ jarvisHome, fs, startProcess, claude, env, now = () 
   return { start, reply, answer, stop, get, list, latestByItem, subscribe, tick, close };
 }
 
-module.exports = { createRunManager, LIMIT_TEXT };
+module.exports = { createRunManager, LIMIT_TEXT, isOrderTool };

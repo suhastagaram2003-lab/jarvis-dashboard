@@ -159,3 +159,20 @@ test("without claude, Execute explains how to set it", async (t) => {
   const r = await b.req("POST", "/api/runs", { body: { project: "marketbrain", item_id: item.id } });
   assert.deepEqual([r.status, r.json.error], [503, "claude.exe not found; set hub.claudePath in src/config/config.json"]);
 });
+
+test("chat refuses a session id that is not an id", async (t) => {
+  const b = await boot(t);
+  const r = await b.req("POST", "/api/runs", { body: { project: "marketbrain", prompt: "hi",
+    session_id: "--dangerously-skip-permissions" } });
+  assert.equal(r.status, 400);
+});
+
+test("every response forbids framing", async (t) => {
+  const b = await boot(t);
+  for (const url of ["/", "/api/state", "/nothing.js"]) {
+    const r = await b.req("GET", url);
+    assert.equal(r.headers["x-frame-options"], "DENY", url);
+    assert.match(r.headers["content-security-policy"], /frame-ancestors 'none'/, url);
+  }
+  assert.equal((await b.req("GET", "/api/state", { auth: false })).headers["x-frame-options"], "DENY");
+});

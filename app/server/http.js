@@ -7,12 +7,17 @@ const { WebSocketServer } = require("ws");
 const policy = require("./policy");
 const { buildState, entryFor } = require("./state");
 const { loadSrc } = require("./load-src");
+const { SESSION_ID } = require("./claude-process");
 const { themeCss, loadAppConfig } = require("./config");
 
 const capture = loadSrc("hub/capture.js");
 const MAX_BODY = 64 * 1024;
 const MAX_PROMPT = 20000;
 const GONE = "this task is no longer in the export; refresh";
+// No framing (another localhost page shares our SameSite site), no third-party code.
+const SAFE_HEADERS = { "cache-control": "no-store", "x-content-type-options": "nosniff", "x-frame-options": "DENY",
+  "content-security-policy": "default-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+  "referrer-policy": "no-referrer" };
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
   ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon",
   ".json": "application/json" };
@@ -35,7 +40,7 @@ function createServer({ jarvisHome, fs, token, runs, webRoot = path.join(__dirna
 
   const send = (res, status, body, type = "application/json") => {
     const text = type === "application/json" ? JSON.stringify(body) : String(body);
-    res.writeHead(status, { "content-type": type, "cache-control": "no-store", "x-content-type-options": "nosniff" });
+    res.writeHead(status, { ...SAFE_HEADERS, "content-type": type });
     res.end(text);
   };
 
@@ -86,8 +91,12 @@ function createServer({ jarvisHome, fs, token, runs, webRoot = path.join(__dirna
     if (typeof prompt !== "string" || !prompt.trim() || prompt.length > MAX_PROMPT) {
       throw new HttpError(400, `prompt must be 1 to ${MAX_PROMPT} characters`);
     }
+    const sessionId = body.session_id === undefined || body.session_id === null ? null : body.session_id;
+    if (sessionId !== null && (typeof sessionId !== "string" || !SESSION_ID.test(sessionId))) {
+      throw new HttpError(400, "session_id is not a session id");
+    }
     return startOrThrow({ kind: "chat", project: entry.name, label, title: prompt.trim().split(/\r?\n/)[0].slice(0, 80),
-      cwd: entry.path, prompt, sessionId: typeof body.session_id === "string" ? body.session_id : null });
+      cwd: entry.path, prompt, sessionId });
   }
 
   function serveStatic(res, urlPath) {
@@ -98,8 +107,7 @@ function createServer({ jarvisHome, fs, token, runs, webRoot = path.join(__dirna
     if (!file.startsWith(root + path.sep)) throw new HttpError(404, "not found");
     let data;
     try { data = fs.readFileSync(file); } catch { throw new HttpError(404, "not found"); }
-    res.writeHead(200, { "content-type": TYPES[path.extname(file)] || "application/octet-stream",
-      "cache-control": "no-store", "x-content-type-options": "nosniff" });
+    res.writeHead(200, { ...SAFE_HEADERS, "content-type": TYPES[path.extname(file)] || "application/octet-stream" });
     res.end(data);
   }
 
@@ -112,7 +120,7 @@ function createServer({ jarvisHome, fs, token, runs, webRoot = path.join(__dirna
       if (!policy.checkToken({ headers: { "x-jarvis-token": url.searchParams.get("t") } }, token)) {
         return send(res, 401, "Open the link printed by npm run app.", "text/plain");
       }
-      res.writeHead(302, { location: "/", "set-cookie": `jarvis_t=${token}; HttpOnly; SameSite=Strict; Path=/` });
+      res.writeHead(302, { ...SAFE_HEADERS, location: "/", "set-cookie": `jarvis_t=${token}; HttpOnly; SameSite=Strict; Path=/` });
       return res.end();
     }
     const refused = gate(req);

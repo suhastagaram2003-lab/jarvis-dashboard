@@ -40,6 +40,8 @@ function main() {
     if (claude.error) console.log(claude.error);
   });
   const shutdown = () => { runs.close(); server.close(() => process.exit(0)); setTimeout(() => process.exit(0), 2000).unref(); };
+  // Backstop: one bad child stream must not take every live run down with the server.
+  process.on("uncaughtException", (e) => console.error("Jarvis: unexpected error:", e && e.stack ? e.stack : e));
   process.on("SIGINT", shutdown);
   process.on("SIGTERM", shutdown);
 }

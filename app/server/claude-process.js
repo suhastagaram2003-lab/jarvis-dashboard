@@ -6,7 +6,10 @@ const childProcess = require("child_process");
 const { PERMISSION_FLAGS } = require("./claude-flags");
 const { DISALLOWED_TOOLS } = require("./policy");
 
+const SESSION_ID = /^[A-Za-z0-9][\w-]{0,127}$/;
+
 function claudeArgs({ sessionId } = {}) {
+  if (sessionId && !SESSION_ID.test(sessionId)) throw new Error(`bad session id: ${sessionId}`);
   return [
     ...(sessionId ? ["--resume", sessionId] : []),
     "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
@@ -40,9 +43,14 @@ function killTree(child) {
 function startProcess({ file, args, cwd, prompt, env, spawn = childProcess.spawn, onEvent }) {
   const child = spawn(file, args, { cwd, env: childEnv(env), shell: false, windowsHide: true,
     stdio: ["pipe", "pipe", "pipe"] });
-  let sessionSent = false, outBuf = "", errBuf = "", exited = false;
+  let sessionSent = false, outBuf = "", errBuf = "", exited = false, closing = false;
+  // A claude that exits before reading stdin makes the next write fail with EPIPE asynchronously; without this
+  // handler that error would take the whole server down.
+  child.stdin.on("error", (e) => onEvent({ type: "stderr", text: `stdin: ${e.message}` }));
+  child.stdout.setEncoding("utf8"); // a multibyte character split across chunks stays whole
+  child.stderr.setEncoding("utf8");
   const write = (line) => {
-    if (!child.stdin.writable) return false;
+    if (closing || !child.stdin.writable) return false;
     try { child.stdin.write(line); return true; } catch { return false; }
   };
 
@@ -68,6 +76,7 @@ function startProcess({ file, args, cwd, prompt, env, spawn = childProcess.spawn
         }
       }
     } else if (msg.type === "result") {
+      closing = true; // from here on the process only exits; replies go to a resumed process instead
       onEvent({ type: "result", is_error: msg.is_error === true, text: typeof msg.result === "string" ? msg.result : "" });
       if (child.stdin.writable) child.stdin.end();
     }
@@ -81,14 +90,14 @@ function startProcess({ file, args, cwd, prompt, env, spawn = childProcess.spawn
   }
 
   child.stdout.on("data", (d) => {
-    outBuf = lines(outBuf, d.toString("utf8"), (line) => {
+    outBuf = lines(outBuf, d, (line) => {
       let msg;
       try { msg = JSON.parse(line); } catch { onEvent({ type: "stderr", text: line }); return; }
       handle(msg);
     });
   });
   child.stderr.on("data", (d) => {
-    errBuf = lines(errBuf, d.toString("utf8"), (line) => onEvent({ type: "stderr", text: line }));
+    errBuf = lines(errBuf, d, (line) => onEvent({ type: "stderr", text: line }));
   });
   const finish = (code) => {
     if (exited) return;
@@ -103,6 +112,7 @@ function startProcess({ file, args, cwd, prompt, env, spawn = childProcess.spawn
   write(userLine(prompt));
   return {
     pid: child.pid,
+    accepting: () => !closing && !exited && child.stdin.writable,
     send: (text) => write(userLine(text)),
     answer: (requestId, allow, input) => write(JSON.stringify({ type: "control_response", response: {
       subtype: "success", request_id: requestId,
@@ -113,4 +123,4 @@ function startProcess({ file, args, cwd, prompt, env, spawn = childProcess.spawn
   };
 }
 
-module.exports = { claudeArgs, startProcess, childEnv, killTree };
+module.exports = { SESSION_ID, claudeArgs, startProcess, childEnv, killTree };

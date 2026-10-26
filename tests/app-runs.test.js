@@ -129,3 +129,56 @@ test("a failing run is failed with its stderr tail; a stopped run is stopped", a
   m2.stop(r2.id);
   assert.equal((await until(m2, r2.id, x => x.status === "stopped")).status, "stopped");
 });
+
+test("an order tool ask is denied by the server and never reaches Lucky", async (t) => {
+  const { m, jarvisHome } = manager({ env: { FAKE_TOOL: "mcp__new-prefix-123__place_stock_order" } });
+  t.after(() => m.close());
+  const run = m.start(execute());
+  const s = await until(m, run.id, x => x.status === "done");
+  const events = m.get(run.id).events;
+  assert.ok(!m.get(run.id).events.some(e => e.type === "permission"));
+  assert.ok(events.some(e => e.type === "answer" && e.allow === false && e.auto === true));
+  assert.match(events.filter(e => e.type === "text").map(e => e.text).join(""), /denied$/);
+  assert.equal(s.status, "done");
+  assert.ok(fs.readFileSync(path.join(jarvisHome, "runs", `${run.id}.jsonl`), "utf8").includes("place_stock_order"));
+});
+
+test("isOrderTool knows the order, position and exercise tools, not the read tools", () => {
+  const { isOrderTool } = require("../app/server/runs");
+  for (const t of ["mcp__x__place_equity_order", "mcp__alpaca__close_all_positions", "mcp__alpaca__cancel_all_orders",
+    "mcp__x__exercise_option", "mcp__alpaca__do_not_exercise_options_position", "mcp__x__decline_trade_approval",
+    "mcp__alpaca__replace_order_by_id", "mcp__x__review_option_order", "mcp__alpaca__update_account_config"]) {
+    assert.ok(isOrderTool(t), t);
+  }
+  for (const t of ["Bash", "mcp__x__get_equity_orders", "mcp__x__get_equity_positions", "mcp__alpaca__get_orders"]) {
+    assert.ok(!isOrderTool(t), t);
+  }
+});
+
+test("a run waiting on Lucky is never marked stalled", async (t) => {
+  const { m, clock } = manager({ stallMs: 1000 });
+  t.after(() => m.close());
+  const run = m.start(execute());
+  await until(m, run.id, s => s.status === "waiting");
+  clock.t += 5000;
+  m.tick();
+  assert.equal(m.get(run.id).summary.status, "waiting");
+});
+
+test("a reply sent between result and exit is answered by a resumed run", async (t) => {
+  const { m } = manager();
+  t.after(() => m.close());
+  const run = m.start(execute());
+  await until(m, run.id, s => s.status === "waiting");
+  let sent = false;
+  m.subscribe(run.id, (e) => { if (e.type === "result" && !sent) { sent = true; m.reply(run.id, "one more thing"); } });
+  m.answer(run.id, "r1", true);
+  await new Promise((resolve) => {
+    const check = () => {
+      if (m.get(run.id).events.some(e => e.type === "text" && e.text.includes("echo: one"))) { off(); resolve(); }
+    };
+    const off = m.subscribe(run.id, check);
+    check();
+  });
+  await until(m, run.id, s => s.status === "done");
+});
