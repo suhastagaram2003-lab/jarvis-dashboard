@@ -97,3 +97,62 @@ test("panelLines reports failures and resumed sessions as status lines", async (
   assert.match(lines[2].text, /rate limited/);
   assert.match(lines[3].text, /code 3/);
 });
+
+const fixtureProject = () => ({
+  name: "marketbrain", label: "MarketBrain", color: "#00d4ff", status: "ok", reason: "",
+  card: { label: "MarketBrain", dot: "ok", queueCount: 1, ageText: "2h ago" },
+  health: { lint_errors: 0, lint_warnings: 3, stale_pages: 2, sources_unprocessed: 4 },
+  agents: [{ name: "MarketBrain nightly", kind: "schedule", status: "ok", last_run: "2026-10-23T02:00:00-04:00",
+    next_run: "2026-10-24T02:00:00-04:00", summary: "Bridges merged PRs.", link: "" }],
+  queue: [item("marketbrain")],
+  learning: [{ date: "2026-10-22", kind: "lesson", title: "Wide opening ranges fail more often",
+    citation: "[[lessons/wide-opening-ranges]]", link: "obsidian://open?vault=Suhas&file=x" }],
+  suggestions: [{ rank: 1, title: "Split the nightly report by stage", why: "Failures are hard to place.", source: "tune" }],
+  metrics: [{ label: "Pick hit rate", value: "58%", trend: "flat", help: "Share of picks above entry." }],
+  links: [{ label: "Vault", url: "obsidian://open?vault=Suhas" }],
+  recent: [{ title: "NVDA", rel: "vault/wiki/NVDA.md", mtime: 1, link: "obsidian://open?vault=Suhas&file=vault%2Fwiki%2FNVDA" }],
+});
+
+test("projectSections lists the eight sections in order with the project's rows", async () => {
+  const { projectSections } = await load();
+  const sections = projectSections(fixtureProject());
+  assert.deepEqual(sections.map(s => s.title), ["Health", "Agents and schedules", "Waiting on you", "What it learned",
+    "Fix next", "Metrics", "Recent pages", "Links"]);
+  assert.deepEqual(sections[0].items.map(i => i.title), ["Lint errors", "Lint warnings", "Stale pages", "Unprocessed sources"]);
+  assert.deepEqual(sections[0].items.map(i => i.value), ["0", "3", "2", "4"]);
+  assert.equal(sections[0].items[1].tone, "warn");
+  assert.equal(sections[1].items[0].title, "MarketBrain nightly");
+  assert.equal(sections[2].items[0].title, "marketbrain item");
+  assert.match(sections[3].items[0].text, /2026-10-22/);
+  assert.match(sections[4].items[0].title, /^1\. Split/);
+  assert.equal(sections[5].items[0].value, "58%");
+  assert.deepEqual([sections[6].items[0].title, sections[6].items[0].link], ["NVDA", "obsidian://open?vault=Suhas&file=vault%2Fwiki%2FNVDA"]);
+  assert.equal(sections[7].items[0].link, "obsidian://open?vault=Suhas");
+});
+
+test("projectSections for a project that did not load is one Not loaded section", async () => {
+  const { projectSections } = await load();
+  const sections = projectSections({ name: "demo", label: "Demo", status: "error", reason: "no export yet",
+    health: null, agents: [], queue: [], learning: [], suggestions: [], metrics: [], links: [], recent: [] });
+  assert.equal(sections.length, 1);
+  assert.equal(sections[0].title, "Not loaded");
+  assert.equal(sections[0].items[0].text, "no export yet");
+});
+
+test("runRows sorts newest first and formats durations", async () => {
+  const { runRows, durationText } = await load();
+  const rows = runRows([
+    { id: "a", kind: "execute", project: "marketbrain", label: "MarketBrain", title: "old", status: "done",
+      started: "2026-10-26T10:00:00.000Z", ended: "2026-10-26T10:02:05.000Z" },
+    { id: "b", kind: "chat", project: "marketbrain", label: "MarketBrain", title: "live", status: "running",
+      started: "2026-10-26T11:00:00.000Z", ended: null },
+    { id: "c", kind: "refresh", project: "demo", label: "Demo", title: "Refresh Demo", status: "failed",
+      started: "2026-10-26T09:00:00.000Z", ended: "2026-10-26T09:00:07.000Z", error: "exit code 1" },
+  ], new Date("2026-10-26T11:03:00.000Z"));
+  assert.deepEqual(rows.map(r => r.id), ["b", "a", "c"]);
+  assert.deepEqual(rows.map(r => r.durationText), ["running", "2m 05s", "7s"]);
+  assert.deepEqual(rows.map(r => r.kind), ["Chat", "Execute", "Refresh"]);
+  assert.equal(rows[1].label, "MarketBrain");
+  assert.ok(rows[1].startedText.length > 0);
+  assert.equal(durationText(3725000), "1h 02m");
+});

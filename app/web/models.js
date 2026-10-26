@@ -142,3 +142,89 @@ function toolSummary(summary) {
 export function openAsks(lines) {
   return lines.filter(l => l.kind === "permission" && !l.answered);
 }
+
+// ── Project tab ──
+const SECTION_TITLES = ["Health", "Agents and schedules", "Waiting on you", "What it learned", "Fix next", "Metrics",
+  "Recent pages", "Links"];
+
+function count(n) {
+  return String(Number.isFinite(Number(n)) ? Number(n) : 0);
+}
+
+export function projectSections(project) {
+  const p = project || {};
+  if (p.status === "error" || !p.health) {
+    return [{ title: "Not loaded", key: "error", items: [{ text: p.reason || "no export yet" }] }];
+  }
+  const h = p.health;
+  const tone = (n, bad = "warn") => (Number(n) > 0 ? bad : "ok");
+  const health = [
+    { title: "Lint errors", value: count(h.lint_errors), tone: tone(h.lint_errors, "error") },
+    { title: "Lint warnings", value: count(h.lint_warnings), tone: tone(h.lint_warnings) },
+    { title: "Stale pages", value: count(h.stale_pages), tone: tone(h.stale_pages) },
+    { title: "Unprocessed sources", value: count(h.sources_unprocessed), tone: tone(h.sources_unprocessed) },
+  ];
+  const agents = (p.agents || []).map(a => ({
+    title: a.name, text: a.summary || "", status: a.status, kind: a.kind,
+    meta: [a.kind, a.last_run ? `last ${shortTime(a.last_run)}` : "", a.next_run ? `next ${shortTime(a.next_run)}` : ""]
+      .filter(Boolean).join(" · "),
+    link: a.link || "",
+  }));
+  const waiting = taskRows({ queue: p.queue || [] }).flatMap(g => g.rows.map(row => ({
+    title: row.title, meta: `${row.kindLabel} · ${row.ageText}`, row, project: g.project,
+  })));
+  const learning = (p.learning || []).map(l => ({
+    title: l.title, text: [l.date, l.kind].filter(Boolean).join(" · "), link: l.link || "", citation: l.citation || "",
+  }));
+  const suggestions = (p.suggestions || []).map(s => ({
+    title: `${s.rank}. ${s.title}`, text: s.why || "", meta: s.source ? `from ${s.source}` : "",
+  }));
+  const metrics = (p.metrics || []).map(m => ({ title: m.label, value: m.value, trend: m.trend, text: m.help || "" }));
+  const recent = (p.recent || []).map(r => ({ title: r.title, text: r.rel || "", link: r.link || "" }));
+  const links = (p.links || []).map(l => ({ title: l.label, link: l.url }));
+  const lists = [health, agents, waiting, learning, suggestions, metrics, recent, links];
+  const keys = ["health", "agents", "waiting", "learning", "suggestions", "metrics", "recent", "links"];
+  const empty = ["", "No agents or schedules exported.", "Nothing waits on you here.", "Nothing learned yet.",
+    "No suggestions.", "No metrics exported.", "No recent pages.", "No links."];
+  return SECTION_TITLES.map((title, i) => ({ title, key: keys[i], items: lists[i], empty: empty[i] }));
+}
+
+// ── Runs tab ──
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const KIND_NAMES = { execute: "Execute", chat: "Chat", refresh: "Refresh" };
+const two = (n) => String(n).padStart(2, "0");
+
+export function shortTime(iso) {
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return String(iso || "");
+  return `${MONTHS[d.getMonth()]} ${d.getDate()}, ${two(d.getHours())}:${two(d.getMinutes())}`;
+}
+
+export function durationText(ms) {
+  const s = Math.max(0, Math.round(ms / 1000));
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60), r = s % 60;
+  if (m < 60) return `${m}m ${two(r)}s`;
+  return `${Math.floor(m / 60)}h ${two(m % 60)}m`;
+}
+
+export function kindName(kind) {
+  return KIND_NAMES[kind] || String(kind || "");
+}
+
+export function runRows(runs, now = new Date()) {
+  return [...(runs || [])]
+    .sort((a, b) => String(b.started || "").localeCompare(String(a.started || "")))
+    .map(r => {
+      const live = isLive(r.status);
+      const start = Date.parse(r.started);
+      const end = live ? now.getTime() : Date.parse(r.ended);
+      const ms = Number.isFinite(start) && Number.isFinite(end) ? end - start : NaN;
+      return {
+        id: r.id, title: r.title || r.id, label: r.label || r.project, project: r.project,
+        kind: kindName(r.kind), kindKey: r.kind, status: r.status, badge: badgeFor(r.status),
+        startedText: shortTime(r.started), durationText: live ? "running" : (Number.isFinite(ms) ? durationText(ms) : ""),
+        error: r.error || "", live,
+      };
+    });
+}

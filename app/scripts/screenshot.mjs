@@ -68,8 +68,40 @@ try {
   check(!(await page.locator(".panel").isVisible()), "back closes the run panel");
   await shot(page, "tasks.png");
 
-  // Later tasks (Task 9) extend this script with the project, chat, runs and phone screenshots.
-  await extra(page);
+  // Project tab: the eight sections and Quick Capture.
+  await page.locator('a.tab-link[href="#project/marketbrain"]').click();
+  await page.waitForSelector(".card-title");
+  const titles = await page.locator(".card-title").allTextContents();
+  check(titles.length === 9 && titles[0].startsWith("Health") && titles[8] === "Quick capture", `project sections (${titles.length})`);
+  await shot(page, "project.png");
+
+  // Chat: one message to the fake claude; the echo and its permission ask show in the panel.
+  await page.locator('a.tab-link[href="#chat"]').click();
+  await page.waitForSelector(".chat-input");
+  await page.fill(".chat-input", "/ask what changed this week?");
+  await page.locator(".chat-send").click();
+  await page.waitForSelector(".panel .ask .approve", { timeout: 15000 });
+  const echo = (await page.locator(".panel .line-claude").allTextContents()).join("\n");
+  check(echo.includes("echo: /ask what changed this week?"), "the chat prompt reached claude unchanged");
+  await shot(page, "chat.png");
+
+  // Runs: both runs are listed, the chat one live.
+  await page.locator('a.tab-link[href="#runs"]').click();
+  await page.waitForSelector(".runs-table .run-row");
+  check((await page.locator(".runs-table .run-row").count()) === 2, "two runs in the history");
+  check((await page.locator(".runs-table .badge-waiting").count()) === 1, "the chat run shows Needs you");
+  await shot(page, "runs.png");
+
+  // Phone: Tasks at 390 px, no sideways scroll.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('a.tab-link[href="#tasks"]').click();
+  await page.waitForSelector(".task-row");
+  const widths = await page.evaluate(() => ({
+    doc: document.documentElement.scrollWidth, body: document.body.scrollWidth,
+    tab: document.getElementById("tab").scrollWidth, tabClient: document.getElementById("tab").clientWidth,
+  }));
+  check(widths.doc <= 390 && widths.body <= 390 && widths.tab <= widths.tabClient, `no sideways scroll at 390px (${JSON.stringify(widths)})`);
+  await shot(page, "phone.png");
 
   check(errors.length === 0, `no page errors (${errors.join(" | ")})`);
 } catch (e) {
@@ -81,5 +113,3 @@ try {
 }
 if (failed) { console.error(failed.stack || failed.message); process.exit(1); }
 console.log(`screenshots in ${OUT}`);
-
-async function extra() { /* filled in by Task 9 */ }

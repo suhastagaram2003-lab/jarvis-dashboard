@@ -49,7 +49,7 @@ function chip(label, value, current, ctx, projects, color) {
     color ? projectDot(color) : null, label);
 }
 
-function taskRow(row, group, ctx) {
+export function taskRow(row, group, ctx) {
   const live = row.badge && ["running", "waiting", "stalled"].includes(row.runStatus);
   const button = el("button", { class: `btn ${live ? "btn-ghost" : "btn-primary"}`, type: "button",
     text: row.buttonLabel, disabled: !!row.disabledReason,

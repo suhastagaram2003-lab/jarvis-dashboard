@@ -1,6 +1,6 @@
 // Run panel — one run, streamed live: header with badge and Stop, the lines, a card per open permission ask,
 // and a reply box. Opened for #run/<id>; replays the log first, then streams.
-import { panelLines, isLive, badgeFor } from "../models.js";
+import { panelLines, isLive, badgeFor, durationText } from "../models.js";
 import { el, clear, badge } from "../dom.js";
 import * as api from "../api.js";
 
@@ -238,13 +238,4 @@ function buildSkeleton(root, { onStop, onClose, onSend }) {
     el("div", { class: "panel-foot" }, reply, send),
   );
   return { title, meta, badge: badgeBox, stop, lines, end, body, reply, send };
-}
-
-export function durationText(ms) {
-  const s = Math.max(0, Math.round(ms / 1000));
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60), r = s % 60;
-  if (m < 60) return `${m}m ${String(r).padStart(2, "0")}s`;
-  const h = Math.floor(m / 60);
-  return `${h}h ${String(m % 60).padStart(2, "0")}m`;
 }

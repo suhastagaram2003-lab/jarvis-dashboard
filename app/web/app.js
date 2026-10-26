@@ -3,10 +3,13 @@ import * as api from "./api.js";
 import { tabList } from "./models.js";
 import { el, clear, clock } from "./dom.js";
 import { renderTasks } from "./views/tasks.js";
+import { renderProject } from "./views/project.js";
+import { renderChat } from "./views/chat.js";
+import { renderRuns } from "./views/runs.js";
 import { createRunPanel } from "./views/run-panel.js";
 
 const POLL_MS = 10000;
-const VIEWS = { tasks: renderTasks };
+const VIEWS = { tasks: renderTasks, project: renderProject, chat: renderChat, runs: renderRuns };
 
 const app = {
   state: null, stateKey: "", stateError: null, updatedAt: null,
@@ -57,6 +60,7 @@ function onHash() {
     app.tab = route;
     panel.close();
     $shell.classList.remove("panel-open");
+    if (route.view === "runs") loadRuns();
   }
   render();
 }
@@ -146,7 +150,8 @@ function render() {
 
 function ctx() {
   return {
-    state: app.state, runs: app.runs, arg: app.tab.arg, api, toast, openRun, navigate, loadState, loadRuns, panel,
+    state: app.state, runs: app.runs, arg: app.tab.arg, api, toast, openRun, closeRun, navigate, render, loadState,
+    loadRuns, panel,
     async execute(project, id) {
       try {
         const run = await api.execute(project, id);
