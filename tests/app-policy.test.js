@@ -63,3 +63,8 @@ test("checkOrigin allows no origin or our own", () => {
   assert.equal(policy.checkOrigin({ headers: { origin: "http://evil.com" } }, 4317), false);
   assert.equal(policy.checkOrigin({ headers: { origin: "null" } }, 4317), false);
 });
+test("DISALLOWED_TOOLS covers the PC's Robinhood connector id and Alpaca write tools", () => {
+  assert.ok(policy.DISALLOWED_TOOLS.includes("mcp__6470aae0-ecce-4513-a1c8-78d3b30271dc__place_equity_order"));
+  assert.ok(policy.DISALLOWED_TOOLS.includes("mcp__alpaca__place_stock_order"));
+  assert.ok(policy.DISALLOWED_TOOLS.includes("mcp__alpaca__close_all_positions"));
+});
