@@ -23,6 +23,13 @@ function join(label, rest) {
 }
 
 function taskHeader(item) {
+  const n = (item && item.count) || 1;
+  const base = baseHeader(item);
+  if (n < 2 || /^Fix \d+ more/.test(base)) return base;
+  return `${base} (${n} ${item.kind === "proposal" ? "drafts" : "times"})`;
+}
+
+function baseHeader(item) {
   const title = squash(item && item.title);
   let m;
   switch (item && item.kind) {

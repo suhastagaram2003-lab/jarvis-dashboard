@@ -26,8 +26,20 @@ function buildState({ fs, jarvisHome, now = new Date(), runsByItem = {} }) {
       items.push({ ...item, project: p.entry.name, label: p.entry.label || p.entry.name, color: p.entry.color });
     }
   }
+  // The same task listed several times (e.g. three drafts for one wiki page) is one row with a count.
+  const folded = new Map();
+  for (const item of items) {
+    const key = [item.project, item.kind, item.title, item.action && item.action.command].join("\u0000");
+    const seen = folded.get(key);
+    if (seen) {
+      seen.count += 1;
+      seen.age_days = Math.max(seen.age_days || 0, item.age_days || 0);
+    } else {
+      folded.set(key, { ...item, count: 1 });
+    }
+  }
   const byName = Object.fromEntries(loaded.map(p => [p.entry.name, p.entry]));
-  const queue = rank(items).map(item => {
+  const queue = rank([...folded.values()]).map(item => {
     const c = commandFor(byName[item.project], item);
     return { ...item, header: taskHeader(item), allowed: c.error || true, run: runsByItem[item.id] || null };
   });
