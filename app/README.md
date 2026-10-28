@@ -34,6 +34,10 @@ afterwards `http://127.0.0.1:4317/` is enough. To start it at log-in, run
 - **Refresh** on a project tab runs that entry's own `export_command`, unchanged, and shows its output as a run.
 - **`hub.claudePath`** in `src/config/config.json`: where `claude.exe` is, if it is not at
   `%USERPROFILE%\.local\bin\claude.exe` or on `PATH`.
+- **`hub.permissionModes`** in `src/config/config.json`, e.g. `{"execute": "default"}`: the permission mode for
+  Execute and Chat runs. Unset, a run inherits your own Claude settings (auto mode on the PC: the classifier allows
+  safe steps and blocks risky ones without asking). `"default"` makes every action that is not pre-allowed wait for
+  Approve or Deny in the run panel.
 - **`hub.port`** (default `4317`), or `JARVIS_PORT`; `JARVIS_HOME` overrides `hub.jarvisHome`.
 
 ## Safety

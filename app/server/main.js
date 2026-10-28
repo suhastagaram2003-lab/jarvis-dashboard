@@ -32,7 +32,7 @@ function main() {
   const token = loadOrCreateToken(fs, config.jarvisHome);
   const claude = locateClaude(config.claudePath);
   const runs = createRunManager({ jarvisHome: config.jarvisHome, fs, startProcess,
-    claude: { file: claude.file, prefixArgs: [] } });
+    claude: { file: claude.file, prefixArgs: [] }, permissionModes: config.permissionModes });
   const server = createServer({ jarvisHome: config.jarvisHome, fs, token, runs, theme: config.theme,
     claudeMissing: claude.error });
   server.listen(config.port, "127.0.0.1", () => {

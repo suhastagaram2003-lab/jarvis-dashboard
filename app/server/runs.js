@@ -54,7 +54,7 @@ function startShell({ command, cwd, env, onEvent, timeoutMs = 120000 }) {
 }
 
 function createRunManager({ jarvisHome, fs, startProcess, claude, env, now = () => new Date(), stallMs = 600000,
-  maxLive = 3, idFn }) {
+  maxLive = 3, idFn, permissionModes = {} }) {
   const dir = path.join(jarvisHome, "runs");
   const indexFile = path.join(dir, "index.json");
   fs.mkdirSync(dir, { recursive: true });
@@ -132,10 +132,11 @@ function createRunManager({ jarvisHome, fs, startProcess, claude, env, now = () 
   }
 
   function spawnFor(run, prompt, sessionId, alreadyRecorded = false) {
-    record(run, { type: "process", resume: sessionId || null });
+    const permissionMode = permissionModes[run.summary.kind] || null;
+    record(run, { type: "process", resume: sessionId || null, permission_mode: permissionMode });
     if (!alreadyRecorded) record(run, { type: "user", text: prompt });
     run.proc = startProcess({
-      file: claude.file, args: [...(claude.prefixArgs || []), ...claudeArgs({ sessionId })],
+      file: claude.file, args: [...(claude.prefixArgs || []), ...claudeArgs({ sessionId, permissionMode })],
       cwd: run.cwd, prompt, env, onEvent: (e) => onEvent(run, e),
     });
   }

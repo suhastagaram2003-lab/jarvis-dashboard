@@ -104,7 +104,7 @@ test("a reply after done resumes the session in the same run", async (t) => {
   const events = m.get(run.id).events;
   assert.ok(events.some(e => e.type === "text" && e.text.includes("echo: and")));
   const log = fs.readFileSync(path.join(jarvisHome, "runs", `${run.id}.jsonl`), "utf8");
-  assert.match(log, /"type":"process","resume":"fake-1"/);
+  assert.match(log, /"type":"process","resume":"fake-1","permission_mode":null/);
 });
 
 test("a refresh run runs the export command and streams its output", async (t) => {
@@ -181,4 +181,15 @@ test("a reply sent between result and exit is answered by a resumed run", async 
     check();
   });
   await until(m, run.id, s => s.status === "done");
+});
+
+test("the manager starts each kind of run in its configured permission mode", async (t) => {
+  const { m, jarvisHome } = manager({ env: { FAKE_HANG: "1" }, permissionModes: { execute: "default" } });
+  t.after(() => m.close());
+  const run = m.start(execute());
+  const chat = m.start({ ...execute(), kind: "chat", item_id: null });
+  await until(m, run.id, s => !!s.session_id);
+  const log = (id) => fs.readFileSync(path.join(jarvisHome, "runs", `${id}.jsonl`), "utf8");
+  assert.match(log(run.id), /"type":"process","resume":null,"permission_mode":"default"/);
+  assert.match(log(chat.id), /"type":"process","resume":null,"permission_mode":null/);
 });

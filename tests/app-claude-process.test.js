@@ -87,3 +87,10 @@ test("claudeArgs refuses a session id that could be read as a flag", () => {
   assert.deepEqual(claudeArgs({ sessionId: "0f8c2a3e-1b2c-4d5e-8f90-123456789abc" }).slice(0, 2),
     ["--resume", "0f8c2a3e-1b2c-4d5e-8f90-123456789abc"]);
 });
+
+test("claudeArgs passes a permission mode only when one is set", () => {
+  assert.ok(!claudeArgs({}).includes("--permission-mode"));
+  const a = claudeArgs({ permissionMode: "default" });
+  assert.equal(a[a.indexOf("--permission-mode") + 1], "default");
+  assert.throws(() => claudeArgs({ permissionMode: "bypassPermissions" }), /permission mode/);
+});

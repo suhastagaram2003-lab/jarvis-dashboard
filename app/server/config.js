@@ -20,6 +20,8 @@ function loadAppConfig(srcDir = SRC) {
     claudePath: hub.claudePath || "",
     port: Number(process.env.JARVIS_PORT || hub.port || 4317),
     theme: config.theme || {},
+    // { execute, chat } -> "default" | "acceptEdits" | "auto" | "plan"; unset inherits the user's own settings.
+    permissionModes: hub.permissionModes || {},
   };
 }
 

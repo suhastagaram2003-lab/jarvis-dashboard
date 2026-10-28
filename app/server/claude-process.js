@@ -8,10 +8,16 @@ const { DISALLOWED_TOOLS } = require("./policy");
 
 const SESSION_ID = /^[A-Za-z0-9][\w-]{0,127}$/;
 
-function claudeArgs({ sessionId } = {}) {
+// "default" makes every non-allowed tool wait for Approve/Deny in the panel; unset, a run inherits the user's own
+// settings (auto mode on Lucky's PC, where the classifier decides and never asks). Never a bypass mode.
+const PERMISSION_MODES = new Set(["default", "acceptEdits", "auto", "plan"]);
+
+function claudeArgs({ sessionId, permissionMode } = {}) {
   if (sessionId && !SESSION_ID.test(sessionId)) throw new Error(`bad session id: ${sessionId}`);
+  if (permissionMode && !PERMISSION_MODES.has(permissionMode)) throw new Error(`bad permission mode: ${permissionMode}`);
   return [
     ...(sessionId ? ["--resume", sessionId] : []),
+    ...(permissionMode ? ["--permission-mode", permissionMode] : []),
     "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
     "--include-partial-messages", ...PERMISSION_FLAGS,
     "--disallowedTools", DISALLOWED_TOOLS.join(","),
@@ -123,4 +129,4 @@ function startProcess({ file, args, cwd, prompt, env, spawn = childProcess.spawn
   };
 }
 
-module.exports = { SESSION_ID, claudeArgs, startProcess, childEnv, killTree };
+module.exports = { SESSION_ID, PERMISSION_MODES, claudeArgs, startProcess, childEnv, killTree };
