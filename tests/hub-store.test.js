@@ -184,3 +184,10 @@ test("no projects gives empty stats", () => {
   const m = store.mergeStats([]);
   assert.deepEqual([m.totalSessions, m.favPct, m.byProject, m.hourlyActivity.length], [0, 0, [], 24]);
 });
+
+test("queue items may carry urgency, id and summary (additive to v1)", () => {
+  const q = [{ ...item(1), urgency: "high", id: "abc", summary: "feat: add the thing" }];
+  assert.equal(store.parseExport(fixture({ queue: q }), NOW).status, "ok");
+  assert.match(store.parseExport(fixture({ queue: [{ ...item(1), urgency: "urgent" }] }), NOW).reason, /urgency/);
+  assert.match(store.parseExport(fixture({ queue: [{ ...item(1), summary: 3 }] }), NOW).reason, /summary/);
+});

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <title>Jarvis</title>
+  <link rel="stylesheet" href="/app.css">
+  <link rel="stylesheet" href="/theme.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#tasks" aria-label="Jarvis, Tasks">
+      <span class="brand-dot" aria-hidden="true"></span><span class="brand-name">JARVIS</span>
+    </a>
+    <nav class="tabs" id="tabs" aria-label="Tabs"></nav>
+    <div class="topbar-right" id="topbar-right"></div>
+  </header>
+  <main class="shell" id="shell">
+    <section class="tab" id="tab" aria-live="polite"></section>
+    <aside class="panel" id="panel" hidden aria-label="Run"></aside>
+  </main>
+  <div class="toasts" id="toasts" aria-live="assertive"></div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

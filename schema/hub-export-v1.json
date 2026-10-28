@@ -105,6 +105,20 @@
             "type": "integer",
             "minimum": 0
           },
+          "urgency": {
+            "type": "string",
+            "enum": [
+              "high",
+              "normal",
+              "low"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
           "action": {
             "type": "object",
             "additionalProperties": false,

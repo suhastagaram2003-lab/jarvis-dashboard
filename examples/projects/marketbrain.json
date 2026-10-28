@@ -13,7 +13,7 @@
       "next_run": "", "summary": "Lucky decides on wiki proposals.", "link": "" }
   ],
   "queue": [
-    { "kind": "proposal", "title": "Update strategies/orb with the October results", "age_days": 2,
+    { "kind": "proposal", "title": "Update strategies/orb with the October results", "age_days": 2, "urgency": "high",
       "action": { "label": "Review", "command": "claude \"/review\"" } },
     { "kind": "proposal", "title": "New lesson: wide opening ranges fail more often", "age_days": 1,
       "action": { "label": "Review", "command": "claude \"/review\"" } },
