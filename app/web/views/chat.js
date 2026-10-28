@@ -39,10 +39,16 @@ export function renderChat(container, ctx) {
     try {
       const key = runKey(project.name);
       const stored = storage.get(key, "");
-      if (stored && await canContinue(ctx, stored)) {
+      const prev = stored ? await storedRun(ctx, stored) : null;
+      if (prev && (isLive(prev.status) || prev.session_id)) {
         ctx.openRun(stored);
         await ctx.panel.open(stored);
-        if (!ctx.panel.send({ type: "reply", text })) throw new Error("the run's stream is not open; try again");
+        if (!ctx.panel.send({ type: "reply", text })) {
+          // The stream did not open: carry the conversation on in a new run on the same session.
+          const run = await ctx.api.chat(project.name, text, prev.session_id || undefined);
+          storage.set(key, run.id);
+          ctx.openRun(run.id);
+        }
       } else {
         if (stored) storage.remove(key);
         const run = await ctx.api.chat(project.name, text);
@@ -61,10 +67,11 @@ export function renderChat(container, ctx) {
     }
   }
 
+  const last = runId ? (ctx.runs || []).find(r => r.id === runId) : null;
   const convo = runId
     ? el("div", { class: "chat-convo" },
-      el("span", { class: "hint", text: "Continuing conversation " }),
-      el("a", { href: `#run/${runId}`, text: runId, class: "mono" }),
+      el("span", { class: "hint", text: "Continuing " }),
+      el("a", { href: `#run/${runId}`, text: last ? last.title : "your last conversation", title: runId }),
       el("button", { class: "btn btn-ghost btn-sm", type: "button", text: "New conversation",
         onclick: () => { storage.remove(runKey(selected)); ctx.closeRun(); } }))
     : el("div", { class: "chat-convo" }, el("span", { class: "hint", text: "A new conversation starts with your first message." }));
@@ -84,10 +91,10 @@ export function renderChat(container, ctx) {
   if (project) input.focus({ preventScroll: true });
 }
 
-// A stored chat run can take another message while it is live or when it left a session to resume.
-async function canContinue(ctx, id) {
+// The stored chat run's summary, or null when it is gone or not a chat.
+async function storedRun(ctx, id) {
   try {
     const r = await ctx.api.getRun(id);
-    return r && r.summary && r.summary.kind === "chat" && (isLive(r.summary.status) || !!r.summary.session_id);
-  } catch { return false; }
+    return r && r.summary && r.summary.kind === "chat" ? r.summary : null;
+  } catch { return null; }
 }

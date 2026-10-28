@@ -116,6 +116,9 @@
           "id": {
             "type": "string"
           },
+          "summary": {
+            "type": "string"
+          },
           "action": {
             "type": "object",
             "additionalProperties": false,

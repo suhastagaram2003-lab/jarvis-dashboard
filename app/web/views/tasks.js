@@ -59,8 +59,9 @@ export function taskRow(row, group, ctx) {
   const side = el("div", { class: "row-side" });
   if (row.badge) {
     const b = badge(row.runStatus);
+    b.textContent = row.badge;
     if (row.runId) {
-      side.append(el("button", { class: "badge-btn", type: "button", title: "Open this run",
+      side.append(el("button", { class: "badge-btn", type: "button", title: "Open the last run's log",
         onclick: () => ctx.openRun(row.runId) }, b));
     } else side.append(b);
   }

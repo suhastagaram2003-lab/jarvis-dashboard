@@ -176,3 +176,19 @@ test("run rows carry the raw prompt as detail, and say Task instead of Execute",
   const [same] = runRows([{ id: "b", kind: "chat", title: "Hi", detail: "Hi", status: "done" }]);
   assert.equal(same.detail, null);
 });
+
+test("a finished run on a task row reads as the last run, a live one as its status", async () => {
+  const { taskRows } = await load();
+  const rows = taskRows({ queue: [item("marketbrain", { run: { id: "r1", status: "done" } }),
+    item("marketbrain", { id: "f".repeat(12), run: { id: "r2", status: "waiting" } })] })[0].rows;
+  assert.deepEqual(rows.map(r => r.badge), ["Last run: Done", "Needs you"]);
+});
+
+test("task runs are named by what they did", async () => {
+  const { runRows, kindName } = await load();
+  const rows = runRows(["proposal", "failed-run", "lint-error", "pr", undefined].map((k, i) =>
+    ({ id: String(i), kind: "execute", item_kind: k, title: "x", status: "done" })));
+  assert.deepEqual(rows.map(r => r.kind).sort(), ["Branch check", "Run fix", "Task", "Wiki fix", "Wiki review"]);
+  assert.equal(kindName("execute", "proposal"), "Wiki review");
+  assert.equal(kindName("chat"), "Chat");
+});

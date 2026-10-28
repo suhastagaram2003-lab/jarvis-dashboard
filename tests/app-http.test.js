@@ -18,6 +18,10 @@ async function boot(t, over = {}) {
   const webRoot = path.join(root, "web");
   fs.mkdirSync(webRoot);
   fs.writeFileSync(path.join(webRoot, "index.html"), "<!doctype html><title>Jarvis</title>");
+  if (over.seedRuns) { // runs left by an earlier server
+    fs.mkdirSync(path.join(home, "runs"), { recursive: true });
+    fs.writeFileSync(path.join(home, "runs", "index.json"), JSON.stringify(over.seedRuns));
+  }
   const runs = createRunManager({ jarvisHome: home, fs, startProcess, env: over.env,
     claude: { file: process.execPath, prefixArgs: [FAKE] } });
   const token = makeToken();
@@ -185,4 +189,45 @@ test("runs are titled with plain headers and keep the raw text as detail", async
   const item = itemWith(b.state(), 'claude "/review"');
   const run = await b.req("POST", "/api/runs", { body: { project: "marketbrain", item_id: item.id } });
   assert.deepEqual([run.json.title, run.json.detail], [item.header, item.title]);
+});
+
+test("execute runs record the task's kind", async (t) => {
+  const b = await boot(t, { env: { FAKE_HANG: "1" } });
+  const item = itemWith(b.state(), 'claude "/review"');
+  const run = await b.req("POST", "/api/runs", { body: { project: "marketbrain", item_id: item.id } });
+  assert.equal(run.json.item_kind, "proposal");
+});
+
+test("runs saved before headers existed come back with a header", async (t) => {
+  const b = await boot(t, { seedRuns: [
+    { id: "old-chat", kind: "chat", project: "marketbrain", label: "MarketBrain", title: "/ask why?", status: "done",
+      started: "2026-10-27T10:00:00.000Z", ended: "2026-10-27T10:01:00.000Z", session_id: "fake-1", error: null }] });
+  const [r] = (await b.req("GET", "/api/runs")).json;
+  assert.deepEqual([r.title, r.detail], ["Question: Why?", "/ask why?"]);
+  assert.equal((await b.req("GET", "/api/runs/old-chat")).json.summary.title, "Question: Why?");
+});
+
+test("a chat from before a restart takes a reply and resumes its session", async (t) => {
+  const b = await boot(t, { seedRuns: [
+    { id: "old-chat", kind: "chat", project: "marketbrain", label: "MarketBrain", title: "Question: Why?",
+      detail: "/ask why?", status: "running", started: "2026-10-27T10:00:00.000Z", ended: null,
+      session_id: "fake-1", error: null }] });
+  const sock = b.ws("old-chat");
+  const seen = [];
+  const done = new Promise((resolve, reject) => {
+    sock.on("message", (data) => {
+      const msg = JSON.parse(data);
+      seen.push(msg);
+      if (msg.type === "replay") {
+        assert.equal(msg.summary.status, "stopped");
+        sock.send(JSON.stringify({ type: "reply", text: "and then?" }));
+      }
+      if (msg.type === "error") reject(new Error(msg.message));
+      if (msg.type === "summary" && msg.summary.status === "done") resolve();
+    });
+  });
+  await done;
+  sock.close();
+  assert.ok(seen.some(m => m.type === "process" && m.resume === "fake-1"));
+  assert.ok(seen.some(m => m.type === "text" && m.text.includes("echo: and")));
 });

@@ -149,7 +149,8 @@ function createRunManager({ jarvisHome, fs, startProcess, claude, env, now = () 
     }
   }
 
-  function start({ kind, project, label, item_id = null, title, detail = "", cwd, prompt, command, sessionId = null }) {
+  function start({ kind, project, label, item_id = null, item_kind = null, title, detail = "", cwd, prompt, command,
+    sessionId = null }) {
     if (kind === "execute" && item_id) {
       const live = [...runs.values()].find(r => r.proc && r.summary.item_id === item_id);
       if (live) return { ...live.summary };
@@ -157,8 +158,8 @@ function createRunManager({ jarvisHome, fs, startProcess, claude, env, now = () 
     checkLimit();
     const id = idFn ? idFn() : defaultId(now());
     const run = {
-      summary: { id, kind, project, label, item_id, title, detail, started: iso(), ended: null, status: "running",
-        session_id: sessionId, error: null },
+      summary: { id, kind, project, label, item_id, ...(item_kind ? { item_kind } : {}), title, detail, started: iso(),
+        ended: null, status: "running", session_id: sessionId, error: null },
       events: [], proc: null, subs: new Set(), asks: new Map(), stderr: [], cwd, queued: [],
       lastEventAt: now().getTime(), stopping: false, failedResult: null,
     };
@@ -171,6 +172,16 @@ function createRunManager({ jarvisHome, fs, startProcess, claude, env, now = () 
       spawnFor(run, prompt, sessionId);
     }
     return { ...run.summary };
+  }
+
+  // A finished run from an earlier server, loaded back so a reply can resume its session in the same run.
+  function revive(id, cwd) {
+    if (runs.has(id)) return true;
+    const stored = get(id);
+    if (!stored || !stored.summary.session_id || stored.summary.kind === "refresh" || !cwd) return false;
+    runs.set(id, { summary: stored.summary, events: stored.events, proc: null, subs: new Set(), asks: new Map(),
+      stderr: [], cwd, queued: [], lastEventAt: now().getTime(), stopping: false, failedResult: null });
+    return true;
   }
 
   function need(id) {
@@ -266,7 +277,7 @@ function createRunManager({ jarvisHome, fs, startProcess, claude, env, now = () 
     for (const run of runs.values()) if (run.proc) { run.stopping = true; run.proc.stop(); }
   }
 
-  return { start, reply, answer, stop, get, list, latestByItem, subscribe, tick, close };
+  return { start, reply, answer, stop, get, list, latestByItem, subscribe, revive, tick, close };
 }
 
 module.exports = { createRunManager, LIMIT_TEXT, isOrderTool };

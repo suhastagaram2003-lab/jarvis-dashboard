@@ -8,7 +8,7 @@ const policy = require("./policy");
 const { buildState, entryFor } = require("./state");
 const { loadSrc } = require("./load-src");
 const { SESSION_ID } = require("./claude-process");
-const { promptHeader } = require("./names");
+const { promptHeader, runName } = require("./names");
 const { themeCss, loadAppConfig } = require("./config");
 
 const capture = loadSrc("hub/capture.js");
@@ -69,6 +69,13 @@ function createServer({ jarvisHome, fs, token, runs, webRoot = path.join(__dirna
     return entry;
   }
 
+  // Runs saved before headers existed get one now; an execute run looks its task up in the current queue.
+  function named(summaries) {
+    if (summaries.every(r => "detail" in r)) return summaries;
+    const queue = new Map(state().queue.map(q => [q.id, q]));
+    return summaries.map(r => runName(r, r.item_id ? queue.get(r.item_id) : null));
+  }
+
   function startOrThrow(spec) {
     try { return runs.start(spec); } catch (e) {
       if (e.code === "LIMIT") throw new HttpError(409, e.message);
@@ -85,7 +92,8 @@ function createServer({ jarvisHome, fs, token, runs, webRoot = path.join(__dirna
       if (!item) throw new HttpError(404, GONE);
       const c = policy.commandFor(entry, item);
       if (c.error) throw new HttpError(403, c.error);
-      return startOrThrow({ kind: "execute", project: entry.name, label, item_id: item.id, title: item.header,
+      return startOrThrow({ kind: "execute", project: entry.name, label, item_id: item.id, item_kind: item.kind,
+        title: item.header,
         detail: item.title,
         cwd: entry.path, prompt: c.prompt });
     }
@@ -131,10 +139,10 @@ function createServer({ jarvisHome, fs, token, runs, webRoot = path.join(__dirna
 
     let m;
     if (req.method === "GET" && p === "/api/state") return send(res, 200, state());
-    if (req.method === "GET" && p === "/api/runs") return send(res, 200, runs.list());
+    if (req.method === "GET" && p === "/api/runs") return send(res, 200, named(runs.list()));
     if (req.method === "GET" && (m = /^\/api\/runs\/([\w.-]+)$/.exec(p))) {
       const r = runs.get(m[1]);
-      return r ? send(res, 200, r) : send(res, 404, { error: "no such run" });
+      return r ? send(res, 200, { ...r, summary: named([r.summary])[0] }) : send(res, 404, { error: "no such run" });
     }
     if (req.method === "POST" && p === "/api/runs") return send(res, 201, postRun(await readBody(req)));
     if (req.method === "POST" && (m = /^\/api\/refresh\/([\w.-]+)$/.exec(p))) {
@@ -179,8 +187,13 @@ function createServer({ jarvisHome, fs, token, runs, webRoot = path.join(__dirna
   });
 
   function streamRun(ws, id) {
-    const r = runs.get(id);
+    let r = runs.get(id);
     if (!r) { ws.close(4404, "no such run"); return; }
+    if (r.summary.session_id && r.summary.kind !== "refresh") { // so a reply can resume a run from before a restart
+      const entry = entryFor(fs, jarvisHome, r.summary.project);
+      if (entry) runs.revive(id, entry.path);
+    }
+    r = { ...r, summary: named([r.summary])[0] };
     const out = (msg) => { if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(msg)); };
     const off = runs.subscribe(id, out);
     out({ type: "replay", events: r.events, summary: r.summary });

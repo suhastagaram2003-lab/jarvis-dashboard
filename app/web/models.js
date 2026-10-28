@@ -48,7 +48,7 @@ export function taskRows(state, filterProject) {
       ageText: ageText(item.age_days), urgency: item.urgency || "normal",
       buttonLabel: live ? "Open run" : ((item.action && item.action.label) || "Execute"),
       disabledReason: item.allowed === true || item.allowed === undefined ? null : String(item.allowed),
-      badge: item.run ? badgeFor(item.run.status) : null,
+      badge: !item.run ? null : (live ? badgeFor(item.run.status) : `Last run: ${badgeFor(item.run.status)}`),
       runStatus: item.run ? item.run.status : null,
       runId: item.run ? item.run.id : null,
     });
@@ -198,6 +198,7 @@ export function projectSections(project) {
 // ── Runs tab ──
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const KIND_NAMES = { execute: "Task", chat: "Chat", refresh: "Refresh" };
+const TASK_NAMES = { proposal: "Wiki review", "failed-run": "Run fix", "lint-error": "Wiki fix", pr: "Branch check" };
 const two = (n) => String(n).padStart(2, "0");
 
 export function shortTime(iso) {
@@ -214,7 +215,8 @@ export function durationText(ms) {
   return `${Math.floor(m / 60)}h ${two(m % 60)}m`;
 }
 
-export function kindName(kind) {
+export function kindName(kind, itemKind) {
+  if (kind === "execute" && TASK_NAMES[itemKind]) return TASK_NAMES[itemKind];
   return KIND_NAMES[kind] || String(kind || "");
 }
 
@@ -229,7 +231,7 @@ export function runRows(runs, now = new Date()) {
       return {
         id: r.id, title: r.title || r.id, detail: detailOf(r.title || r.id, r.detail), label: r.label || r.project,
         project: r.project,
-        kind: kindName(r.kind), kindKey: r.kind, status: r.status, badge: badgeFor(r.status),
+        kind: kindName(r.kind, r.item_kind), kindKey: r.kind, status: r.status, badge: badgeFor(r.status),
         startedText: shortTime(r.started), durationText: live ? "running" : (Number.isFinite(ms) ? durationText(ms) : ""),
         error: r.error || "", live,
       };

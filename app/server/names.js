@@ -8,6 +8,10 @@ const COMMANDS = {
   reflect: "Reflect on outcomes", ask: "Question", desk: "Desk", "deep-dive": "Deep dive",
 };
 
+// Branch names the Claude app makes up (claude/vigorous-dhawan-c19678, claude/project-thread-rvwynx) say nothing.
+const APP_BRANCH = /^claude\/(project-thread-\w+|[a-z]+-[a-z]+-[0-9a-f]{4,})$/;
+const CONVENTIONAL = /^\w+(\([^)]*\))?!?:\s*/; // "feat(app): " in a commit subject
+
 const squash = (s) => String(s || "").replace(/\s+/g, " ").trim();
 const capital = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 
@@ -26,7 +30,7 @@ function taskHeader(item) {
   const n = (item && item.count) || 1;
   const base = baseHeader(item);
   if (n < 2 || /^Fix \d+ more/.test(base)) return base;
-  return `${base} (${n} ${item.kind === "proposal" ? "drafts" : "times"})`;
+  return `${base} · ${n} ${item.kind === "proposal" ? "drafts" : "times"}`;
 }
 
 function baseHeader(item) {
@@ -44,7 +48,9 @@ function baseHeader(item) {
       return cut(m ? `Fix wiki issue: ${m[2]} (${m[1]})` : join("Fix wiki issue", title), 80);
     case "pr":
       if (/conflict/i.test(title)) return cut(join("Fix merge conflict", title), 80);
+      if (item.summary) return cut(join("Finish branch", capital(squash(item.summary).replace(CONVENTIONAL, ""))), 80);
       m = /^(\S+) (has commits )?not merged into (\S+)$/.exec(title);
+      if (m && APP_BRANCH.test(m[1])) return "Finish unmerged Claude work";
       return cut(m ? `Finish branch: ${m[1]}` : join("Finish branch", title), 80);
     default:
       return cut(title || "Task", 80);
@@ -65,4 +71,15 @@ function promptHeader(prompt) {
   return cut(capital(first));
 }
 
-module.exports = { taskHeader, promptHeader };
+// Runs saved before headers existed carry the raw prompt or item title and no detail: name them at read time.
+// An execute run gets its header and kind from the queue item when that item is still exported.
+function runName(summary, item) {
+  if (!summary || "detail" in summary || summary.kind === "refresh") return summary;
+  if (summary.kind === "chat") return { ...summary, title: promptHeader(summary.title), detail: summary.title };
+  if (summary.kind === "execute" && item) {
+    return { ...summary, title: item.header || taskHeader(item), detail: summary.title, item_kind: item.kind };
+  }
+  return { ...summary };
+}
+
+module.exports = { taskHeader, promptHeader, runName };

@@ -1,10 +1,8 @@
 // Run panel — one run, streamed live: header with badge and Stop, the lines, a card per open permission ask,
 // and a reply box. Opened for #run/<id>; replays the log first, then streams.
-import { panelLines, isLive, badgeFor, durationText } from "../models.js";
+import { panelLines, isLive, badgeFor, durationText, kindName } from "../models.js";
 import { el, clear, badge } from "../dom.js";
 import * as api from "../api.js";
-
-const KIND = { execute: "Task", chat: "Chat", refresh: "Refresh" };
 
 export function createRunPanel(root, { onClose, onSummary, toast }) {
   let current = null; // { id, socket, summary, events, nodes, replayed, resolveReplay }
@@ -82,7 +80,7 @@ export function createRunPanel(root, { onClose, onSummary, toast }) {
     const s = run.summary;
     parts.title.textContent = s.title || s.id;
     parts.title.title = s.title || s.id;
-    parts.meta.textContent = `${KIND[s.kind] || s.kind} · ${s.label || s.project}`;
+    parts.meta.textContent = `${kindName(s.kind, s.item_kind)} · ${s.label || s.project}`;
     parts.meta.title = `Run ${s.id}`;
     parts.detail.textContent = s.detail && s.detail !== s.title ? s.detail : "";
     parts.detail.hidden = !parts.detail.textContent;

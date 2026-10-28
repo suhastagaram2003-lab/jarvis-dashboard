@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { taskHeader, promptHeader } = require("../app/server/names");
+const { taskHeader, promptHeader, runName } = require("../app/server/names");
 
 const t = (kind, title) => ({ kind, title });
 
@@ -35,4 +35,31 @@ test("long headers are cut at a word with an ellipsis", () => {
 test("empty input still gives a header", () => {
   assert.equal(promptHeader("   "), "Chat");
   assert.equal(taskHeader({ kind: "proposal" }), "Review wiki change");
+});
+
+test("a repeat count reads as a plain suffix, even after a title that ends in brackets", () => {
+  assert.equal(taskHeader({ kind: "proposal", title: "Tune (MarketBrain)", count: 4 }),
+    "Review wiki change: Tune (MarketBrain) · 4 drafts");
+  assert.equal(taskHeader({ kind: "failed-run", title: "Nightly failed", count: 2 }), "Fix failed run: Nightly · 2 times");
+});
+
+test("branch rows use the export's summary, and say Claude work for app-made branch names", () => {
+  assert.equal(taskHeader({ kind: "pr", title: "claude/vigorous-dhawan-c19678 not merged into dev",
+    summary: "feat(app): fold repeated tasks into one row" }), "Finish branch: Fold repeated tasks into one row");
+  assert.equal(taskHeader({ kind: "pr", title: "claude/vigorous-dhawan-c19678 not merged into dev" }),
+    "Finish unmerged Claude work");
+  assert.equal(taskHeader({ kind: "pr", title: "claude/project-thread-rvwynx not merged into dev" }),
+    "Finish unmerged Claude work");
+  assert.equal(taskHeader({ kind: "pr", title: "feat/hub-export not merged into dev" }), "Finish branch: feat/hub-export");
+});
+
+test("runName gives runs saved before headers existed a header, a detail and a kind", () => {
+  assert.deepEqual(runName({ id: "a", kind: "chat", title: "/ask what changed?" }),
+    { id: "a", kind: "chat", title: "Question: What changed?", detail: "/ask what changed?" });
+  assert.deepEqual(runName({ id: "b", kind: "execute", title: "Tune", item_id: "x" }, { kind: "proposal", header: "Review wiki change: Tune" }),
+    { id: "b", kind: "execute", title: "Review wiki change: Tune", detail: "Tune", item_id: "x", item_kind: "proposal" });
+  const fresh = { id: "c", kind: "chat", title: "Question: Hi", detail: "/ask hi" };
+  assert.equal(runName(fresh), fresh);
+  assert.deepEqual(runName({ id: "d", kind: "execute", title: "Gone", item_id: "y" }),
+    { id: "d", kind: "execute", title: "Gone", item_id: "y" });
 });

@@ -69,7 +69,7 @@ test("identical tasks fold into one row with a count", () => {
   const s = buildState({ fs, jarvisHome: home, now: NOW });
   assert.equal(s.queue.length, 2);
   const sma = s.queue.find(q => q.title === "SMA Momentum Agent");
-  assert.deepEqual([sma.count, sma.age_days, sma.header], [3, 4, "Review wiki change: SMA Momentum Agent (3 drafts)"]);
+  assert.deepEqual([sma.count, sma.age_days, sma.header], [3, 4, "Review wiki change: SMA Momentum Agent · 3 drafts"]);
   assert.equal(s.queue.find(q => q.title === "Other page").count, 1);
   assert.equal(s.projects.find(p => p.name === "marketbrain").queue.length, 2);
 });
