@@ -5,6 +5,7 @@ const nodePath = require("path");
 const { loadSrc, hubSchema } = require("./load-src");
 const { rank } = require("./urgency");
 const { commandFor } = require("./policy");
+const { taskHeader } = require("./names");
 
 const store = loadSrc("hub/hub-store.js", { hubSchema: hubSchema() });
 const { recentFiles } = loadSrc("hub/recent.js");
@@ -28,7 +29,7 @@ function buildState({ fs, jarvisHome, now = new Date(), runsByItem = {} }) {
   const byName = Object.fromEntries(loaded.map(p => [p.entry.name, p.entry]));
   const queue = rank(items).map(item => {
     const c = commandFor(byName[item.project], item);
-    return { ...item, allowed: c.error || true, run: runsByItem[item.id] || null };
+    return { ...item, header: taskHeader(item), allowed: c.error || true, run: runsByItem[item.id] || null };
   });
 
   const projects = loaded.map(p => {

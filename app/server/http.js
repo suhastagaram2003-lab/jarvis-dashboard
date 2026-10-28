@@ -8,6 +8,7 @@ const policy = require("./policy");
 const { buildState, entryFor } = require("./state");
 const { loadSrc } = require("./load-src");
 const { SESSION_ID } = require("./claude-process");
+const { promptHeader } = require("./names");
 const { themeCss, loadAppConfig } = require("./config");
 
 const capture = loadSrc("hub/capture.js");
@@ -84,7 +85,8 @@ function createServer({ jarvisHome, fs, token, runs, webRoot = path.join(__dirna
       if (!item) throw new HttpError(404, GONE);
       const c = policy.commandFor(entry, item);
       if (c.error) throw new HttpError(403, c.error);
-      return startOrThrow({ kind: "execute", project: entry.name, label, item_id: item.id, title: item.title,
+      return startOrThrow({ kind: "execute", project: entry.name, label, item_id: item.id, title: item.header,
+        detail: item.title,
         cwd: entry.path, prompt: c.prompt });
     }
     const prompt = body.prompt;
@@ -95,7 +97,8 @@ function createServer({ jarvisHome, fs, token, runs, webRoot = path.join(__dirna
     if (sessionId !== null && (typeof sessionId !== "string" || !SESSION_ID.test(sessionId))) {
       throw new HttpError(400, "session_id is not a session id");
     }
-    return startOrThrow({ kind: "chat", project: entry.name, label, title: prompt.trim().split(/\r?\n/)[0].slice(0, 80),
+    return startOrThrow({ kind: "chat", project: entry.name, label, title: promptHeader(prompt),
+      detail: prompt.trim().slice(0, 500),
       cwd: entry.path, prompt, sessionId });
   }
 
@@ -140,7 +143,7 @@ function createServer({ jarvisHome, fs, token, runs, webRoot = path.join(__dirna
       const c = policy.refreshFor(entry);
       if (c.error) throw new HttpError(403, c.error);
       return send(res, 201, startOrThrow({ kind: "refresh", project: entry.name, label: entry.label || entry.name,
-        title: `Refresh ${entry.label || entry.name}`, cwd: entry.path, command: c.command }));
+        title: `Refresh ${entry.label || entry.name} status`, detail: "Re-run the project's hub export", cwd: entry.path, command: c.command }));
     }
     if (req.method === "POST" && p === "/api/capture") {
       const body = await readBody(req);

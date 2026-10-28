@@ -53,3 +53,11 @@ test("runsByItem shows each item's latest run", () => {
   assert.deepEqual(s.queue[0].run, run);
   assert.equal(s.queue[1].run, null);
 });
+
+test("every queue item carries a plain header and keeps its raw title", () => {
+  const { home } = makeHome({ now: NOW });
+  const s = buildState({ fs, jarvisHome: home, now: NOW });
+  const review = s.queue.find(q => q.title === "New lesson: wide opening ranges fail more often");
+  assert.equal(review.header, "Review wiki change: New lesson: wide opening ranges fail more often");
+  assert.equal(s.queue.find(q => q.kind === "pr").header, "Finish branch: feat/hub-export");
+});

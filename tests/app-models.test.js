@@ -151,8 +151,28 @@ test("runRows sorts newest first and formats durations", async () => {
   ], new Date("2026-10-26T11:03:00.000Z"));
   assert.deepEqual(rows.map(r => r.id), ["b", "a", "c"]);
   assert.deepEqual(rows.map(r => r.durationText), ["running", "2m 05s", "7s"]);
-  assert.deepEqual(rows.map(r => r.kind), ["Chat", "Execute", "Refresh"]);
+  assert.deepEqual(rows.map(r => r.kind), ["Chat", "Task", "Refresh"]);
   assert.equal(rows[1].label, "MarketBrain");
   assert.ok(rows[1].startedText.length > 0);
   assert.equal(durationText(3725000), "1h 02m");
+});
+
+test("task rows lead with the plain header and keep the raw title as detail", async () => {
+  const { taskRows, kindLabel } = await load();
+  const s = { queue: [item("marketbrain", { header: "Finish branch: feat/x", title: "feat/x not merged into dev" }),
+    item("marketbrain", { id: "f".repeat(12), header: "Review wiki change: Same", title: "Same" })] };
+  const rows = taskRows(s)[0].rows;
+  assert.deepEqual([rows[0].title, rows[0].detail], ["Finish branch: feat/x", "feat/x not merged into dev"]);
+  assert.deepEqual([rows[1].title, rows[1].detail], ["Review wiki change: Same", null]);
+  assert.deepEqual(["proposal", "failed-run", "lint-error", "pr"].map(kindLabel),
+    ["Wiki change", "Failed run", "Wiki issue", "Branch"]);
+});
+
+test("run rows carry the raw prompt as detail, and say Task instead of Execute", async () => {
+  const { runRows } = await load();
+  const [r] = runRows([{ id: "a", kind: "execute", title: "Question: Why?", detail: "/ask why?", status: "done",
+    started: "2026-10-26T10:00:00.000Z", ended: "2026-10-26T10:00:05.000Z" }]);
+  assert.deepEqual([r.title, r.detail, r.kind], ["Question: Why?", "/ask why?", "Task"]);
+  const [same] = runRows([{ id: "b", kind: "chat", title: "Hi", detail: "Hi", status: "done" }]);
+  assert.equal(same.detail, null);
 });

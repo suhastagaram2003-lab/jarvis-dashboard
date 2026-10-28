@@ -148,7 +148,7 @@ function createRunManager({ jarvisHome, fs, startProcess, claude, env, now = () 
     }
   }
 
-  function start({ kind, project, label, item_id = null, title, cwd, prompt, command, sessionId = null }) {
+  function start({ kind, project, label, item_id = null, title, detail = "", cwd, prompt, command, sessionId = null }) {
     if (kind === "execute" && item_id) {
       const live = [...runs.values()].find(r => r.proc && r.summary.item_id === item_id);
       if (live) return { ...live.summary };
@@ -156,7 +156,7 @@ function createRunManager({ jarvisHome, fs, startProcess, claude, env, now = () 
     checkLimit();
     const id = idFn ? idFn() : defaultId(now());
     const run = {
-      summary: { id, kind, project, label, item_id, title, started: iso(), ended: null, status: "running",
+      summary: { id, kind, project, label, item_id, title, detail, started: iso(), ended: null, status: "running",
         session_id: sessionId, error: null },
       events: [], proc: null, subs: new Set(), asks: new Map(), stderr: [], cwd, queued: [],
       lastEventAt: now().getTime(), stopping: false, failedResult: null,

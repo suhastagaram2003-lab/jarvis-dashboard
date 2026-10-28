@@ -176,3 +176,13 @@ test("every response forbids framing", async (t) => {
   }
   assert.equal((await b.req("GET", "/api/state", { auth: false })).headers["x-frame-options"], "DENY");
 });
+
+test("runs are titled with plain headers and keep the raw text as detail", async (t) => {
+  const b = await boot(t, { env: { FAKE_HANG: "1" } });
+  const chat = await b.req("POST", "/api/runs", { body: { project: "marketbrain", prompt: "/ask what did the agents learn this week?" } });
+  assert.deepEqual([chat.json.title, chat.json.detail],
+    ["Question: What did the agents learn this week?", "/ask what did the agents learn this week?"]);
+  const item = itemWith(b.state(), 'claude "/review"');
+  const run = await b.req("POST", "/api/runs", { body: { project: "marketbrain", item_id: item.id } });
+  assert.deepEqual([run.json.title, run.json.detail], [item.header, item.title]);
+});

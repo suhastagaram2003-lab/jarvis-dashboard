@@ -4,7 +4,7 @@ import { panelLines, isLive, badgeFor, durationText } from "../models.js";
 import { el, clear, badge } from "../dom.js";
 import * as api from "../api.js";
 
-const KIND = { execute: "Execute", chat: "Chat", refresh: "Refresh" };
+const KIND = { execute: "Task", chat: "Chat", refresh: "Refresh" };
 
 export function createRunPanel(root, { onClose, onSummary, toast }) {
   let current = null; // { id, socket, summary, events, nodes, replayed, resolveReplay }
@@ -82,7 +82,10 @@ export function createRunPanel(root, { onClose, onSummary, toast }) {
     const s = run.summary;
     parts.title.textContent = s.title || s.id;
     parts.title.title = s.title || s.id;
-    parts.meta.textContent = `${KIND[s.kind] || s.kind} · ${s.label || s.project} · ${s.id}`;
+    parts.meta.textContent = `${KIND[s.kind] || s.kind} · ${s.label || s.project}`;
+    parts.meta.title = `Run ${s.id}`;
+    parts.detail.textContent = s.detail && s.detail !== s.title ? s.detail : "";
+    parts.detail.hidden = !parts.detail.textContent;
     setBadge(s.status);
     setLive(isLive(s.status), s);
     const canReply = s.kind !== "refresh" && (isLive(s.status) || !!s.session_id);
@@ -214,6 +217,7 @@ function buildSkeleton(root, { onStop, onClose, onSend }) {
   clear(root);
   const title = el("h2", { class: "panel-title", text: "" });
   const meta = el("div", { class: "panel-meta", text: "" });
+  const detail = el("div", { class: "panel-detail", text: "", hidden: true });
   const badgeBox = el("span", { class: "panel-badge" });
   const stop = el("button", { class: "btn btn-danger btn-sm", type: "button", text: "Stop", hidden: true, onclick: onStop });
   const closeBtn = el("button", { class: "icon-btn", type: "button", text: "×", title: "Close (Esc)",
@@ -232,10 +236,10 @@ function buildSkeleton(root, { onStop, onClose, onSend }) {
   const send = el("button", { class: "btn btn-primary", type: "button", text: "Send", onclick: onSend });
   root.append(
     el("div", { class: "panel-head" },
-      el("div", { class: "panel-head-text" }, meta, title),
+      el("div", { class: "panel-head-text" }, meta, title, detail),
       el("div", { class: "panel-actions" }, badgeBox, stop, closeBtn)),
     body,
     el("div", { class: "panel-foot" }, reply, send),
   );
-  return { title, meta, badge: badgeBox, stop, lines, end, body, reply, send };
+  return { title, meta, detail, badge: badgeBox, stop, lines, end, body, reply, send };
 }

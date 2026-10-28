@@ -3,7 +3,12 @@
 const LIVE = new Set(["running", "waiting", "stalled"]);
 const BADGES = { running: "Running", waiting: "Needs you", done: "Done", failed: "Failed", stopped: "Stopped",
   stalled: "Stalled" };
-const KIND_LABELS = { proposal: "Proposal", "failed-run": "Failed run", "lint-error": "Lint", pr: "PR" };
+const KIND_LABELS = { proposal: "Wiki change", "failed-run": "Failed run", "lint-error": "Wiki issue", pr: "Branch" };
+// The raw title or prompt under a plain header, unless the header already says it.
+const detailOf = (header, raw) => {
+  const r = raw ? String(raw).trim() : "";
+  return r && !String(header || "").includes(r) ? r : null;
+};
 
 export function isLive(status) {
   return LIVE.has(status);
@@ -38,7 +43,8 @@ export function taskRows(state, filterProject) {
     }
     const live = item.run && isLive(item.run.status);
     group.rows.push({
-      id: item.id, kind: item.kind, kindLabel: kindLabel(item.kind), title: item.title,
+      id: item.id, kind: item.kind, kindLabel: kindLabel(item.kind), title: item.header || item.title,
+      detail: detailOf(item.header || item.title, item.title),
       ageText: ageText(item.age_days), urgency: item.urgency || "normal",
       buttonLabel: live ? "Open run" : ((item.action && item.action.label) || "Execute"),
       disabledReason: item.allowed === true || item.allowed === undefined ? null : String(item.allowed),
@@ -191,7 +197,7 @@ export function projectSections(project) {
 
 // ── Runs tab ──
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const KIND_NAMES = { execute: "Execute", chat: "Chat", refresh: "Refresh" };
+const KIND_NAMES = { execute: "Task", chat: "Chat", refresh: "Refresh" };
 const two = (n) => String(n).padStart(2, "0");
 
 export function shortTime(iso) {
@@ -221,7 +227,8 @@ export function runRows(runs, now = new Date()) {
       const end = live ? now.getTime() : Date.parse(r.ended);
       const ms = Number.isFinite(start) && Number.isFinite(end) ? end - start : NaN;
       return {
-        id: r.id, title: r.title || r.id, label: r.label || r.project, project: r.project,
+        id: r.id, title: r.title || r.id, detail: detailOf(r.title || r.id, r.detail), label: r.label || r.project,
+        project: r.project,
         kind: kindName(r.kind), kindKey: r.kind, status: r.status, badge: badgeFor(r.status),
         startedText: shortTime(r.started), durationText: live ? "running" : (Number.isFinite(ms) ? durationText(ms) : ""),
         error: r.error || "", live,

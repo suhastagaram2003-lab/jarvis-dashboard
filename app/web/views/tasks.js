@@ -70,6 +70,7 @@ export function taskRow(row, group, ctx) {
     el("span", { class: `pip pip-${row.urgency}`, title: `${row.urgency} urgency`, attrs: { "aria-label": `${row.urgency} urgency` } }),
     el("div", { class: "row-main" },
       el("div", { class: "row-title", text: row.title }),
+      row.detail ? el("div", { class: "row-detail", text: row.detail }) : null,
       el("div", { class: "row-meta" },
         el("span", { class: `kind kind-${row.kind}`, text: row.kindLabel }),
         el("span", { class: "meta-sep", text: "·" }),
