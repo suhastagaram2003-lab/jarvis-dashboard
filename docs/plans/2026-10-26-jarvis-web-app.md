@@ -380,3 +380,37 @@ modules, Playwright (already on the PC and in cloud containers) for screenshots 
 
 `mb hub export` sets `queue[].urgency` (`failed-run` and conflicted PRs `high`) and `queue[].id`, with a test against
 the updated schema copy.
+
+## Outcome
+
+Built 2026-10-26 to 2026-10-28 in the "Build Jarvis web app" thread on branch `claude/project-thread-xc7c65`,
+PR #3 into `dev`. Lucky approved the plan on 2026-10-26 and chose inline execution; Fable built the front end.
+
+**Shipped:** the local web app (`npm run app`, 127.0.0.1:4317 behind a token cookie) with a Tasks tab ranked by
+urgency and grouped by project, one Execute button per task that runs the task's own `claude "<prompt>"` with a live
+log, Approve/Deny, reply and Stop, per-project tabs, Chat with a project's Claude (resumes across app restarts) and run
+history. Order and trade tools are blocked by `--disallowedTools` and denied again server-side by name.
+`hub.permissionModes` lets Lucky choose the permission mode for Execute and Chat runs; unset, runs inherit the PC's
+auto mode, so no Approve/Deny cards appear there.
+
+**Naming pass (Lucky, 2026-10-28):** every task, run and chat leads with a plain header (`app/server/names.js`), with
+the raw title or prompt as a grey detail line: "Review wiki change: X · 4 drafts", "Fix failed run: X", "Finish
+branch: <last commit subject>" (from the export's new optional `queue[].summary`), "Question: …" for `/ask` chats.
+Runs say "Wiki review", "Run fix", "Wiki fix" or "Branch check" instead of "Task"; a finished run on a task row reads
+"Last run: Done"; a resumed reply is timed on its own.
+
+**MarketBrain side:** PR #92 (`queue[].urgency` and runnable prompts, merged 2026-10-26) and PR #93 (branch
+`summary`, merges after this PR because the hub refuses unknown export keys).
+
+**PC checks:** 2026-10-26 to 2026-10-28 on the laptop through Remote Control: tests 197 passed, 1 skipped at
+`3ad4919`; the app loaded the real exports (18 tasks, MarketBrain and BetBrain), ran a read-only chat, resumed it
+after a restart and showed the new headers.
+
+**Rulings during the build:** `commandFor` checks the `claude "…"` form before `allowed_commands`; repeated identical
+queue items fold into one row with a count.
+
+**Deferred:** a Stop between a run's result and its exit shows "stopped"; the in-memory run map is never pruned
+(both minor, from the final review). BetBrain's branch rows read "Finish unmerged Claude work" until `bb hub export`
+adds `summary` (instructions handed to Lucky for the BetBrain project).
+
+**Rejected:** merging the vaults (BetBrain hard rule); Obsidian as the main UI (Lucky found it too restrictive).
