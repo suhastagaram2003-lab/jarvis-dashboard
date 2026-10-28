@@ -124,7 +124,7 @@ function createRunManager({ jarvisHome, fs, startProcess, claude, env, now = () 
       if (queued.length && status === "done" && run.summary.session_id) {
         // Lucky replied while the last turn was closing: answer it in a resumed process.
         spawnFor(run, queued.join("\n\n"), run.summary.session_id, true);
-        setStatus(run, "running");
+        setStatus(run, "running", { turn_started: iso() });
       } else {
         setStatus(run, status, { ended: iso(), error });
       }
@@ -207,7 +207,7 @@ function createRunManager({ jarvisHome, fs, startProcess, claude, env, now = () 
       const e = new Error("this run cannot take replies"); e.code = "NO_REPLY"; throw e;
     }
     checkLimit();
-    setStatus(run, "running", { ended: null, error: null });
+    setStatus(run, "running", { ended: null, error: null, turn_started: iso() }); // each reply is timed on its own
     spawnFor(run, text, run.summary.session_id);
     return { ...run.summary };
   }

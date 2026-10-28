@@ -99,7 +99,8 @@ export function createRunPanel(root, { onClose, onSummary, toast }) {
   }
 
   function endText(s) {
-    const ms = s.started && s.ended ? Date.parse(s.ended) - Date.parse(s.started) : NaN;
+    const from = s.turn_started || s.started; // a resumed run is timed from its last reply
+    const ms = from && s.ended ? Date.parse(s.ended) - Date.parse(from) : NaN;
     const dur = Number.isFinite(ms) ? ` in ${durationText(ms)}` : "";
     if (s.status === "failed") return `Failed${dur}${s.error ? ": " + s.error : ""}`;
     if (s.status === "stopped") return `Stopped${dur}${s.error ? " (" + s.error + ")" : ""}`;

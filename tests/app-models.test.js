@@ -93,7 +93,7 @@ test("panelLines reports failures and resumed sessions as status lines", async (
     { type: "result", is_error: true, text: "rate limited" }, { type: "exit", code: 3 },
   ]);
   assert.deepEqual(lines.map(l => l.kind), ["status", "user", "status", "status"]);
-  assert.match(lines[0].text, /Resumed/);
+  assert.match(lines[0].text, /Continued the conversation/);
   assert.match(lines[2].text, /rate limited/);
   assert.match(lines[3].text, /code 3/);
 });
@@ -191,4 +191,13 @@ test("task runs are named by what they did", async () => {
   assert.deepEqual(rows.map(r => r.kind).sort(), ["Branch check", "Run fix", "Task", "Wiki fix", "Wiki review"]);
   assert.equal(kindName("execute", "proposal"), "Wiki review");
   assert.equal(kindName("chat"), "Chat");
+});
+
+test("a resumed conversation reads plainly and a reply is timed on its own", async () => {
+  const { panelLines, runRows } = await load();
+  const [line] = panelLines([{ type: "process", resume: "2d2ce79a-ad18-4d0f-9e7c-a1e79a2ca09a" }]);
+  assert.equal(line.text, "Continued the conversation");
+  const [r] = runRows([{ id: "a", kind: "chat", title: "Hi", status: "done", started: "2026-10-26T10:00:00.000Z",
+    turn_started: "2026-10-26T10:28:00.000Z", ended: "2026-10-26T10:28:25.000Z" }]);
+  assert.equal(r.durationText, "25s");
 });

@@ -193,3 +193,16 @@ test("the manager starts each kind of run in its configured permission mode", as
   assert.match(log(run.id), /"type":"process","resume":null,"permission_mode":"default"/);
   assert.match(log(chat.id), /"type":"process","resume":null,"permission_mode":null/);
 });
+
+test("a reply after done marks when its own turn started", async (t) => {
+  const { m, clock } = manager();
+  t.after(() => m.close());
+  const run = m.start(execute());
+  await until(m, run.id, s => s.status === "waiting");
+  m.answer(run.id, "r1", true);
+  await until(m, run.id, s => s.status === "done");
+  clock.t += 60000;
+  m.reply(run.id, "and then?");
+  assert.equal(m.get(run.id).summary.turn_started, "2026-10-26T10:01:00.000Z");
+  await until(m, run.id, s => s.status === "done");
+});

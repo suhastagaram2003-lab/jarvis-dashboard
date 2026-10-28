@@ -120,7 +120,7 @@ export function panelLines(events) {
         push({ kind: "stderr", text: e.text || "" });
         break;
       case "process":
-        if (e.resume) push({ kind: "status", text: `Resumed session ${e.resume}`, tone: "muted" });
+        if (e.resume) push({ kind: "status", text: "Continued the conversation", tone: "muted" });
         break;
       case "result":
         if (e.is_error) push({ kind: "status", text: `Claude reported an error: ${e.text || "no detail"}`, tone: "error" });
@@ -225,7 +225,7 @@ export function runRows(runs, now = new Date()) {
     .sort((a, b) => String(b.started || "").localeCompare(String(a.started || "")))
     .map(r => {
       const live = isLive(r.status);
-      const start = Date.parse(r.started);
+      const start = Date.parse(r.turn_started || r.started); // a resumed run is timed from its last reply
       const end = live ? now.getTime() : Date.parse(r.ended);
       const ms = Number.isFinite(start) && Number.isFinite(end) ? end - start : NaN;
       return {
