@@ -16,7 +16,9 @@ npm run app
 The server prints a link like `http://127.0.0.1:4317/?t=<token>`. Open it once in your browser; it sets a cookie, so
 afterwards `http://127.0.0.1:4317/` is enough. To start it at log-in, run
 `powershell -ExecutionPolicy Bypass -File app\scripts\install-startup.ps1` once (add `-Remove` to undo). That puts a
-`Jarvis` shortcut in your Startup folder; it does not start anything at install time.
+`Jarvis` shortcut in your Startup folder and a `Jarvis` shortcut on your desktop that opens the app signed in
+(`app\scripts\open.ps1`, which puts the token from `~/.jarvis/app-token` into the link without printing it); it does
+not start anything at install time. A browser without the cookie gets a page that points to that shortcut.
 
 ## What it reads and writes
 

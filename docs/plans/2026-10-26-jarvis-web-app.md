@@ -414,3 +414,7 @@ queue items fold into one row with a count.
 adds `summary` (instructions handed to Lucky for the BetBrain project).
 
 **Rejected:** merging the vaults (BetBrain hard rule); Obsidian as the main UI (Lucky found it too restrictive).
+
+**Follow-up 2026-10-29:** Lucky's browser had no token cookie and got a bare "Open the link printed by npm run app."
+page. `app/scripts/open.ps1` now opens the app signed in without printing the token, `install-startup.ps1` adds a
+desktop "Jarvis" shortcut that runs it, and the sign-in page points to that shortcut.

@@ -27,6 +27,8 @@ class HttpError extends Error {
   constructor(status, message) { super(message); this.status = status; }
 }
 
+const SIGN_IN = "Jarvis needs its sign-in link: double-click the Jarvis shortcut on your desktop, or run app\\scripts\\open.ps1.";
+
 function createServer({ jarvisHome, fs, token, runs, webRoot = path.join(__dirname, "..", "web"), theme = loadAppConfig().theme,
   claudeMissing = null, now = () => new Date() }) {
   const root = path.resolve(webRoot);
@@ -35,7 +37,7 @@ function createServer({ jarvisHome, fs, token, runs, webRoot = path.join(__dirna
     const port = req.socket.localPort;
     if (!policy.checkHost(req, port)) return [421, "wrong host"];
     if (!policy.checkOrigin(req, port)) return [403, "wrong origin"];
-    if (!policy.checkToken(req, token)) return [401, "Open the link printed by npm run app."];
+    if (!policy.checkToken(req, token)) return [401, SIGN_IN];
     return null;
   }
 
@@ -129,7 +131,7 @@ function createServer({ jarvisHome, fs, token, runs, webRoot = path.join(__dirna
       const port = req.socket.localPort;
       if (!policy.checkHost(req, port)) return send(res, 421, "wrong host", "text/plain");
       if (!policy.checkToken({ headers: { "x-jarvis-token": url.searchParams.get("t") } }, token)) {
-        return send(res, 401, "Open the link printed by npm run app.", "text/plain");
+        return send(res, 401, SIGN_IN, "text/plain");
       }
       res.writeHead(302, { ...SAFE_HEADERS, location: "/", "set-cookie": `jarvis_t=${token}; HttpOnly; SameSite=Strict; Path=/` });
       return res.end();
