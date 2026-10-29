@@ -128,6 +128,7 @@ test("a failing run is failed with its stderr tail; a stopped run is stopped", a
   const r2 = m2.start(execute());
   m2.stop(r2.id);
   assert.equal((await until(m2, r2.id, x => x.status === "stopped")).status, "stopped");
+  assert.ok(m2.get(r2.id).events.some(e => e.type === "stop"), "the log marks that Lucky stopped it");
 });
 
 test("an order tool ask is denied by the server and never reaches Lucky", async (t) => {

@@ -57,7 +57,7 @@ const itemWith = (s, command) => s.queue.find(q => q.action.command === command)
 test("refuses requests without the token, with a foreign Host or a foreign Origin", async (t) => {
   const b = await boot(t);
   assert.equal((await b.req("GET", "/api/state", { auth: false })).status, 401);
-  assert.equal((await b.req("GET", "/", { auth: false })).text.trim(), "Open the link printed by npm run app.");
+  assert.equal((await b.req("GET", "/", { auth: false })).text.trim(), "Jarvis needs its sign-in link: double-click the Jarvis shortcut on your desktop, or run app\\scripts\\open.ps1.");
   assert.equal((await b.req("GET", "/api/state", { headers: { host: `evil.com:${b.port}` } })).status, 421);
   assert.equal((await b.req("GET", "/api/state", { headers: { origin: "http://evil.com" } })).status, 403);
 });
