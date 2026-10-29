@@ -201,3 +201,9 @@ test("a resumed conversation reads plainly and a reply is timed on its own", asy
     turn_started: "2026-10-26T10:28:00.000Z", ended: "2026-10-26T10:28:25.000Z" }]);
   assert.equal(r.durationText, "25s");
 });
+
+test("a run Lucky stopped says so instead of showing the kill's exit code", async () => {
+  const { panelLines } = await load();
+  const lines = panelLines([{ type: "user", text: "go" }, { type: "stop" }, { type: "exit", code: 1 }]);
+  assert.deepEqual(lines.map(l => [l.kind, l.text, l.tone]), [["user", "go", undefined], ["status", "Stopped by you", "muted"]]);
+});

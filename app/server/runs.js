@@ -227,6 +227,7 @@ function createRunManager({ jarvisHome, fs, startProcess, claude, env, now = () 
     const run = need(id);
     if (!run.proc) return false;
     run.stopping = true;
+    record(run, { type: "stop" });
     run.proc.stop();
     return true;
   }

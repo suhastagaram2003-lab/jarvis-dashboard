@@ -90,6 +90,7 @@ export function panelLines(events) {
   const lines = [];
   const asks = new Map();
   let text = null;
+  let stopped = false;
   const push = (line) => { text = null; lines.push(line); return line; };
   for (const e of events || []) {
     switch (e.type) {
@@ -120,12 +121,18 @@ export function panelLines(events) {
         push({ kind: "stderr", text: e.text || "" });
         break;
       case "process":
+        stopped = false; // a new process after a stop reports its own exit
         if (e.resume) push({ kind: "status", text: "Continued the conversation", tone: "muted" });
         break;
       case "result":
         if (e.is_error) push({ kind: "status", text: `Claude reported an error: ${e.text || "no detail"}`, tone: "error" });
         break;
+      case "stop":
+        stopped = true;
+        push({ kind: "status", text: "Stopped by you", tone: "muted" });
+        break;
       case "exit":
+        if (stopped) break; // a stopped process exits non-zero on Windows (taskkill); "Stopped by you" says it
         if (e.code !== 0 && e.code !== null && e.code !== undefined) {
           push({ kind: "status", text: `Process exited with code ${e.code}`, tone: "error" });
         } else if (e.code === null || e.code === undefined) {
